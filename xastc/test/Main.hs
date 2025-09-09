@@ -47,6 +47,9 @@ testVarIdent = TestCase $ do
 
 testType :: Test
 testType = TestCase $ do
+   assertParses type' "fn(Int, Bool) -> ()" (TyFn [TyCon (Ident "Int"), TyCon (Ident "Bool")] (TyTuple []))
+   assertParses type' "fn(a, Maybe b) -> Bool" (TyFn [TyGnr (Ident "a"), TyApp (TyCon (Ident "Maybe")) (TyGnr (Ident "b"))] (TyCon (Ident "Bool")))
+   assertParses type' "fn() -> Int" (TyFn [] (TyCon (Ident "Int")))
    assertParses type' "a" (TyGnr (Ident "a"))
    assertParses type' "Bool" (TyCon (Ident "Bool"))
    assertParses type' "Maybe a" (TyApp (TyCon (Ident "Maybe")) (TyGnr (Ident "a")))
@@ -59,6 +62,7 @@ testType = TestCase $ do
       )
    assertFails type' ""
    assertFails type' "(Bool, a, Maybe String"
+   assertFails type' "fn(Int, Bool) String"
 
 testParseField :: Test
 testParseField = TestCase $ do
@@ -142,6 +146,20 @@ testParseCtor = TestCase $ do
 
 testParseTypeDef :: Test
 testParseTypeDef = TestCase $ do
+   assertParses typedef "type F = F (fn(Int) -> Bool) Int Bool"
+      (TypeDef
+         (Ident "F")
+         []
+         [Ctor
+            (Ident "F")
+            (PTuple
+               [ TyFn [TyCon (Ident "Int")] (TyCon (Ident "Bool"))
+               , TyCon (Ident "Int")
+               , TyCon (Ident "Bool")
+               ]
+            )
+         ]
+      )
    assertParses typedef "type Maybe a = Just a | Nothing"
       (TypeDef 
          (Ident "Maybe")

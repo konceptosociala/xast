@@ -71,10 +71,11 @@ field = do
    return Field {..}
 
 data Type
-   = TyGnr Ident     -- a, b, c...
-   | TyCon Ident     -- Bool, Int, String
-   | TyApp Type Type -- Maybe a, Either a Int...
-   | TyTuple [Type]  -- (Bool, a, Maybe String)
+   = TyGnr Ident        -- a, b, c...
+   | TyCon Ident        -- Bool, Int, String
+   | TyApp Type Type    -- Maybe a, Either a Int...
+   | TyTuple [Type]     -- (Bool, a, Maybe String)
+   | TyFn [Type] Type   -- fn(Type1, Type2 ... TypeN) -> TypeRet
    deriving (Eq, Show)
 
 type' :: Parser Type
@@ -85,6 +86,11 @@ type' = do
 atomType :: Parser Type
 atomType = choice
    [ tupleOrParens
+   , TyFn 
+      <$ symbol "fn" 
+      <*> between (symbol "(") (symbol ")") (sepBy type' (symbol ","))
+      <* symbol "->"
+      <*> type'
    , TyCon <$> typeIdent
    , TyGnr <$> genericIdent
    ]

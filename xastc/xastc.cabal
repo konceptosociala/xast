@@ -2,7 +2,7 @@ cabal-version:      3.0
 name:               xastc
 version:            0.1.0.0
 -- synopsis:
--- description:
+description:        Xast language compiler
 license:            Unlicense
 license-file:       LICENSE
 author:             Oleksandr Hnutov
@@ -20,7 +20,8 @@ library
         Xast,
         Xast.Parser,
         Xast.Parser.Ident,
-        Xast.Parser.Type
+        Xast.Parser.Type,
+        Xast.Parser.Function
     -- other-modules:
     -- other-extensions:
     build-depends:    
