@@ -20,7 +20,7 @@ data Literal
    | LitChar Char
    | LitInt Int
    | LitFloat Float
-   | LitArray [Literal]
+   | LitList [Literal]
    | LitTuple [Literal]
    -- // TODO: Impl lambda
    -- | LitLambda Lambda
@@ -33,7 +33,7 @@ literal = choice
    , LitChar   <$> charLiteral
    , LitFloat  <$> try signedFloat
    , LitInt    <$> signedInt
-   , LitArray  <$> between (symbol "[") (symbol "]") (literal `sepBy` symbol ",")
+   , LitList  <$> between (symbol "[") (symbol "]") (literal `sepBy` symbol ",")
    ]
 
 data Lambda = Lambda

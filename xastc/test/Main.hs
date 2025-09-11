@@ -244,17 +244,64 @@ testParseLiteral = TestCase $ do
    assertParses literal "42" (LitInt 42)
    assertParses literal "-7" (LitInt (-7))
    assertParses literal "3.14" (LitFloat 3.14)
-   assertParses literal "[1, 2, 3]" (LitArray [LitInt 1, LitInt 2, LitInt 3])
+   assertParses literal "[1, 2, 3]" (LitList [LitInt 1, LitInt 2, LitInt 3])
    assertParses literal "(\"a\", 'b', 3)" (LitTuple [LitString "a", LitChar 'b', LitInt 3])
-   assertParses literal "[]" (LitArray [])
+   assertParses literal "[]" (LitList [])
    assertParses literal "()" (LitTuple [])
    assertParses literal "(12)" (LitInt 12)
-   assertParses literal "[12]" (LitArray [LitInt 12])
+   assertParses literal "[12]" (LitList [LitInt 12])
    assertFails literal "\"Unclosed string"
    assertFails literal "'ab'"
    assertFails literal "3.14.15"
    assertFails literal "abc"
    assertFails literal "[)"
+
+testParsePattern :: Test
+testParsePattern = TestCase $ do
+   assertParses pattern "_" PatWildcard
+   assertParses pattern "x" (PatVar (Ident "x"))
+   assertParses pattern "Just x" (PatCon (Ident "Just") [PatVar (Ident "x")])
+   assertParses pattern "Nothing" (PatCon (Ident "Nothing") [])
+   assertParses pattern "(x, y)" (PatTuple [PatVar (Ident "x"), PatVar (Ident "y")])
+   assertParses pattern "(x, Just y)" (PatTuple [PatVar (Ident "x"), PatCon (Ident "Just") [PatVar (Ident "y")]])
+   assertParses pattern "[1, 2, 3]"
+      (PatLit
+         (LitList 
+            [ LitInt 1
+            , LitInt 2
+            , LitInt 3
+            ]
+         )
+      )
+   assertParses pattern "[1, 2, x]"
+      (PatList 
+         [ PatLit (LitInt 1)
+         , PatLit (LitInt 2)
+         , PatVar (Ident "x")
+         ]
+      )
+   assertParses pattern "(a, _, \"b\", True)" 
+      (PatTuple 
+         [ PatVar (Ident "a")
+         , PatWildcard
+         , PatLit (LitString "b")
+         , PatCon (Ident "True") []
+         ]
+      )
+   assertParses pattern "[]" (PatLit (LitList []))
+   assertParses pattern "[x, 1, y]" 
+      (PatList 
+         [ PatVar (Ident "x")
+         , PatLit (LitInt 1)
+         , PatVar (Ident "y")
+         ]
+      )
+   assertParses pattern "\"abc\"" (PatLit (LitString "abc"))
+   assertParses pattern "42" (PatLit (LitInt 42))
+   assertParses pattern "True" (PatCon (Ident "True") [])
+   assertFails pattern "(a, b"
+   assertFails pattern "[x, y"
+   assertFails pattern "\"abc"
 
 -- Tests
 
@@ -271,6 +318,7 @@ tests = TestList
    , TestLabel "Parse typedef" testParseTypeDef
    , TestLabel "Parse funcdef" testParseFuncDef
    , TestLabel "Parse literals" testParseLiteral
+   , TestLabel "Parse patterns" testParsePattern
    ]
 
 main :: IO ()
