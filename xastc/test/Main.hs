@@ -4,7 +4,9 @@ module Main (main) where
 
 import Test.HUnit
 import Xast.Parser.Ident
+import Xast.Parser.Function
 import Xast.Parser.Type
+import Xast.Parser.Expr
 import Xast.Parser (Parser)
 import Text.Megaparsec (runParser, errorBundlePretty, MonadParsec (eof))
 import Data.Text (Text)
@@ -209,6 +211,51 @@ testParseTypeDef = TestCase $ do
    assertFails typedef "type Maybe a = Just a | "
    assertFails typedef "type Maybe a = | Nothing"
 
+testParseFuncDef :: Test
+testParseFuncDef = TestCase $ do
+   assertParses funcdef "fn myFunc (Int, Maybe a, (Either a b, a)) -> String"
+      (FuncDef
+         (Ident "myFunc")
+         [ TyCon (Ident "Int")
+         , TyApp (TyCon (Ident "Maybe")) (TyGnr (Ident "a"))
+         , TyTuple 
+            [ TyApp 
+               (TyApp (TyCon (Ident "Either")) (TyGnr (Ident "a"))) 
+               (TyGnr (Ident "b"))
+            , TyGnr (Ident "a")
+            ]
+         ]
+         (TyCon (Ident "String"))
+      )
+   assertParses funcdef "fn doStuff () -> ()"
+      (FuncDef
+         (Ident "doStuff")
+         []
+         (TyTuple [])
+      )
+   assertFails funcdef "fn MyFunc (Int) -> Bool"      -- invalid function name (should be lowercase)
+   assertFails funcdef "fn myFunc Int -> Bool"        -- missing parentheses
+   assertFails funcdef "fn myFunc (Int, Bool) Bool"   -- missing '->'
+
+testParseLiteral :: Test
+testParseLiteral = TestCase $ do
+   assertParses literal "\"Hello, World!\"" (LitString "Hello, World!")
+   assertParses literal "'c'" (LitChar 'c')
+   assertParses literal "42" (LitInt 42)
+   assertParses literal "-7" (LitInt (-7))
+   assertParses literal "3.14" (LitFloat 3.14)
+   assertParses literal "[1, 2, 3]" (LitArray [LitInt 1, LitInt 2, LitInt 3])
+   assertParses literal "(\"a\", 'b', 3)" (LitTuple [LitString "a", LitChar 'b', LitInt 3])
+   assertParses literal "[]" (LitArray [])
+   assertParses literal "()" (LitTuple [])
+   assertParses literal "(12)" (LitInt 12)
+   assertParses literal "[12]" (LitArray [LitInt 12])
+   assertFails literal "\"Unclosed string"
+   assertFails literal "'ab'"
+   assertFails literal "3.14.15"
+   assertFails literal "abc"
+   assertFails literal "[)"
+
 -- Tests
 
 tests :: Test
@@ -222,6 +269,8 @@ tests = TestList
    , TestLabel "Parse payload" testParsePayload
    , TestLabel "Parse ctor" testParseCtor
    , TestLabel "Parse typedef" testParseTypeDef
+   , TestLabel "Parse funcdef" testParseFuncDef
+   , TestLabel "Parse literals" testParseLiteral
    ]
 
 main :: IO ()

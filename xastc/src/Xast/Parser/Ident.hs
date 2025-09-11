@@ -13,7 +13,10 @@ import Text.Megaparsec
 import Xast.Parser
 
 newtype Ident = Ident { unIdent :: Text }
-   deriving (Eq, Ord, Show, Generic)
+   deriving (Eq, Ord, Generic)
+
+instance Show Ident where
+   show = show . unIdent
 
 genericIdent :: Parser Ident
 genericIdent = lexeme $ do

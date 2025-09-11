@@ -3,7 +3,7 @@
 
 module Xast.Parser.Type
    ( TypeDef(..), typedef
-   , Type(..), type'
+   , Type(..), type', atomType
    , Field(..), field
    , Payload(..), payload
    , Ctor(..), ctor
@@ -88,7 +88,7 @@ atomType = choice
    [ tupleOrParens
    , TyFn 
       <$ symbol "fn" 
-      <*> between (symbol "(") (symbol ")") (sepBy type' (symbol ","))
+      <*> between (symbol "(") (symbol ")") (type' `sepBy` symbol ",")
       <* symbol "->"
       <*> type'
    , TyCon <$> typeIdent
