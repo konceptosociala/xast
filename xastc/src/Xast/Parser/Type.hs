@@ -10,7 +10,7 @@ module Xast.Parser.Type
    ) where
 
 import Xast.Parser.Ident
-import Xast.Parser (Parser, symbol, lexeme)
+import Xast.Parser (Parser, symbol, lexeme, endOfStmt)
 import Text.Megaparsec (choice, sepBy, between, some, MonadParsec (try), many, sepBy1)
 import Data.Function ((&))
 
@@ -28,6 +28,7 @@ typedef = do
    tdGenerics  <- many genericIdent
    _           <- symbol "="
    tdCtors     <- ctor `sepBy1` symbol "|"
+   _           <- endOfStmt
 
    return TypeDef {..}
 

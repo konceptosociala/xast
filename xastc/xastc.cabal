@@ -39,6 +39,7 @@ executable xastc
     -- other-extensions:
     build-depends:
         base ^>=4.18.3.0,
+        text ==2.0.2,
         xastc
 
     hs-source-dirs:   app

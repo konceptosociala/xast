@@ -3,13 +3,13 @@
 
 module Xast.Parser.Function
    ( FuncDef(..), funcdef
-   , FuncImpl(..)
+   , FuncImpl(..), funcImpl
    , Pattern(..), pattern
    ) where
       
 import Xast.Parser.Type (Type, type')
 import Xast.Parser.Ident (Ident, fnIdent, varIdent, typeIdent)
-import Xast.Parser.Expr (Literal, literal)
+import Xast.Parser.Expr (Literal, literal, Expr, expr)
 import Xast.Parser
 import Text.Megaparsec (between, sepBy, choice, MonadParsec (try), many)
 
@@ -28,6 +28,7 @@ funcdef = do
    fdArgs   <- between (symbol "(") (symbol ")") (type' `sepBy` symbol ",")
    _        <- symbol "->"
    fdRet    <- type'
+   _        <- endOfStmt
 
    return FuncDef {..}
 
@@ -35,9 +36,20 @@ funcdef = do
 data FuncImpl = FuncImpl
    { fnName :: Ident
    , fnArgs :: [Pattern]
-   , fnImpl :: ()
+   , fnBody :: Expr
    }
    deriving (Eq, Show)
+
+funcImpl :: Parser FuncImpl
+funcImpl = do
+   _        <- symbol "fn"
+   fnName   <- fnIdent
+   fnArgs   <- many pattern
+   _        <- symbol "="
+   fnBody   <- expr
+   _        <- endOfStmt
+
+   return FuncImpl {..}
 
 data Pattern
    = PatVar Ident             -- a

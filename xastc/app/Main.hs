@@ -1,8 +1,13 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main where
 
-import qualified Xast (someFunc)
+import qualified Xast (parse)
+import Data.Text (pack)
 
 main :: IO ()
 main = do
-  putStrLn "Hello, Haskell!"
-  Xast.someFunc
+  let filePath = "test.xst"
+
+  fileContent <- readFile filePath
+  Xast.parse filePath $ pack fileContent

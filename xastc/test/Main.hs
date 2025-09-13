@@ -174,38 +174,58 @@ testParseTypeDef = TestCase $ do
             PUnit
          ]
       )
-   assertParses typedef "type Tree a = Node { left : Maybe (Tree a), right : Maybe (Tree a) } | Leaf"
-      (TypeDef 
-         (Ident "Tree")
-         [Ident "a"]
-         [ Ctor 
-            (Ident "Node")
-            (PRecord 
-               [ Field 
-                  (Ident "left")
-                  (TyApp 
-                     (TyCon (Ident "Maybe"))
+
+   let tree = 
+         TypeDef 
+            (Ident "Tree")
+            [Ident "a"]
+            [ Ctor 
+               (Ident "Node")
+               (PRecord 
+                  [ Field 
+                     (Ident "left")
                      (TyApp 
-                        (TyCon (Ident "Tree"))
-                        (TyGnr (Ident "a"))
+                        (TyCon (Ident "Maybe"))
+                        (TyApp 
+                           (TyCon (Ident "Tree"))
+                           (TyGnr (Ident "a"))
+                        )
                      )
-                  )
-               , Field 
-                  (Ident "right")
-                  (TyApp 
-                     (TyCon (Ident "Maybe"))
+                  , Field 
+                     (Ident "right")
                      (TyApp 
-                        (TyCon (Ident "Tree"))
-                        (TyGnr (Ident "a"))
+                        (TyCon (Ident "Maybe"))
+                        (TyApp 
+                           (TyCon (Ident "Tree"))
+                           (TyGnr (Ident "a"))
+                        )
                      )
-                  )
-               ]
-            )
-         , Ctor 
-            (Ident "Leaf")
-            PUnit
-         ]
-      )
+                  ]
+               )
+            , Ctor 
+               (Ident "Leaf")
+               PUnit
+            ]
+         
+   assertParses typedef 
+      "type Tree a \
+      \   = Node {\
+      \      left : Maybe (Tree a),\
+      \      right : Maybe (Tree a) \
+      \   } \
+      \   | Leaf"
+      tree
+   assertParses typedef 
+      "type Tree a = Node { left : Maybe (Tree a), right : Maybe (Tree a) } | Leaf"
+      tree
+   assertFails typedef
+      "type Tree a \
+      \   = Node {\
+      \      left : Maybe (Tree a),\
+      \      right : Maybe (Tree a) \
+      \   } \
+      \   | Leaf"
+      
 
    assertFails typedef "type Maybe a Just a | Nothing"
    assertFails typedef "type Maybe a = Just a | "

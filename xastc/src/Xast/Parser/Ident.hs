@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Xast.Parser.Ident 
    ( Ident(..)
    , typeIdent
@@ -18,6 +20,9 @@ newtype Ident = Ident { unIdent :: Text }
 instance Show Ident where
    show = show . unIdent
 
+keywords :: [Text]
+keywords = ["type", "fn", "let", "in", "if", "then", "else", "match", "of", "and"]
+
 genericIdent :: Parser Ident
 genericIdent = lexeme $ do
    c <- lowerChar
@@ -27,10 +32,18 @@ typeIdent :: Parser Ident
 typeIdent = pascalCase
 
 fnIdent :: Parser Ident
-fnIdent = camelCase
+fnIdent = try $ do
+   ident <- camelCase
+   if unIdent ident `elem` keywords
+      then fail "keyword cannot be used as identifier"
+      else return ident
 
 varIdent :: Parser Ident
-varIdent = camelCase
+varIdent = try $ do
+   ident <- camelCase
+   if unIdent ident `elem` keywords
+      then fail "keyword cannot be used as identifier"
+      else return ident
 
 pascalCase :: Parser Ident
 pascalCase = lexeme $ do

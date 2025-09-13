@@ -1,0 +1,37 @@
+
+-- Test.XST
+
+type Tree a 
+   = Node {
+      left : Maybe (Tree a),
+      right : Maybe (Tree a) 
+   } 
+   | Leaf a;
+
+type Rec = Rec {
+   fieldOne : Int,
+   field2 : Either Int Bool
+};
+
+type Rec2 = Rec2 { a : Int, b : String };
+
+type X a = A | B | C | Other a;
+
+fn myFunction(Bool, Int) -> Tree Int;
+
+fn myFunction _ 0 = Leaf 0;
+
+fn myFunction a b =
+   if a
+   then Leaf b
+   else Leaf 0;
+
+fn add() -> Int;
+fn add =
+    let a = 1 and
+    let b = 2 in
+
+        add a b;
+
+fn apply1 = func (a b);
+fn apply2 = (func a) b;
