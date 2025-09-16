@@ -10,31 +10,36 @@ module Xast.Parser.Expr
 import Data.Text (Text, pack)
 import Xast.Parser.Ident (Ident, varIdent, typeIdent)
 import Xast.Parser (Parser, lexeme, sc, symbol)
-import Text.Megaparsec (choice, manyTill, between, sepBy, MonadParsec (try), some, sepBy1)
+import Text.Megaparsec (choice, manyTill, between, sepBy, MonadParsec (try), some, sepBy1, optional)
 import qualified Text.Megaparsec.Char.Lexer as L
 import Text.Megaparsec.Char (char)
 
-data Expr 
-   = ExpVar Ident          -- add, a
-   | ExpCon Ident          -- Nothing, Just
-   | ExpLit Literal        -- "abc", 12, ()
-   | ExpLambda Lambda      -- .\x y -> x + y
-   | ExpApp Expr Expr      -- Just 12, func a b
-   | ExpLetIn LetIn        -- let a = 1 and let b = 2 in ...
-   | ExpIfThen IfThenElse  -- if ... then ... else ...
-   -- | ExpMatch Match        -- match EXPR of 
+type ModBind = Maybe Ident
+
+data Expr
+   = ExpVar ModBind Ident                 -- add, a
+   | ExpCon ModBind Ident                 -- Nothing, Just
+   | ExpLit Literal                       -- "abc", 12, ()
+   | ExpLambda Lambda                     -- .\x y -> x + y
+   | ExpApp Expr Expr                     -- Just 12, func a b
+   | ExpLetIn LetIn                       -- let a = 1 and let b = 2 in ...
+   | ExpIfThen IfThenElse                 -- if ... then ... else ...
+   -- | ExpMatch Match                    -- match EXPR of 
    deriving (Eq, Show)
 
 atomExpr :: Parser Expr
 atomExpr = choice
-   [ between (symbol "(") (symbol ")") expr
-   , ExpVar    <$> varIdent
-   , ExpCon    <$> typeIdent
+   [ parens
+   , ExpVar    <$> (optional . try $ typeIdent <* ".") <*> varIdent
+   , ExpCon    <$> (optional . try $ typeIdent <* ".") <*> typeIdent
    , ExpLit    <$> literal
    , ExpLambda <$> lambda
    , ExpLetIn  <$> letIn
    , ExpIfThen <$> ifThenElse
    ]
+
+parens :: Parser Expr
+parens = between (symbol "(") (symbol ")") expr
 
 expr :: Parser Expr
 expr = do
@@ -43,7 +48,7 @@ expr = do
 
 -- data Match = Match deriving (Eq, Show)
 
-data IfThenElse = IfThenElse 
+data IfThenElse = IfThenElse
    { iteIf :: Expr
    , iteThen :: Expr
    , iteElse :: Expr
@@ -61,7 +66,7 @@ ifThenElse = do
 
    return IfThenElse {..}
 
-data Lambda = Lambda 
+data Lambda = Lambda
    { lamArgs :: [Ident]
    , lamBody :: Expr
    }
@@ -93,7 +98,7 @@ letIn = do
 data Let = Let
    { letIdent :: Ident
    , letValue :: Expr
-   } 
+   }
    deriving (Eq, Show)
 
 let' :: Parser Let

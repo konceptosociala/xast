@@ -1,26 +1,43 @@
+{-# LANGUAGE RecordWildCards #-}
 module Xast (parse) where
 
 import Xast.Parser.Type (TypeDef, typedef)
 import Xast.Parser.Function (FuncDef, funcdef, FuncImpl, funcImpl)
 import Xast.Parser (Parser, sc)
-import Text.Megaparsec (many, choice, runParser, MonadParsec (eof, try), errorBundlePretty)
+import Text.Megaparsec (choice, runParser, MonadParsec (eof, try), errorBundlePretty, some, many)
 import Data.Text (Text)
+import Xast.Parser.Headers (ModuleDef, ImportDef, moduleDef, importDef)
 
-data Xast
-   = TypeDef TypeDef
-   | FuncDef FuncDef
-   | FuncImpl FuncImpl
+data Program = Program
+   { progModuleDef :: ModuleDef
+   , progImports :: [ImportDef]
+   , progStmts :: [Stmt]
+   }
    deriving (Eq, Show)
 
-xast :: Parser [Xast]
-xast = sc *> many (choice
-   [ try (TypeDef    <$> typedef)
-   , try (FuncDef    <$> funcdef)
-   , try (FuncImpl   <$> funcImpl)
-   ])
+program :: Parser Program
+program = do
+   progModuleDef  <- moduleDef
+   progImports    <- many importDef
+   progStmts      <- some stmt
+
+   return Program {..}
+
+data Stmt
+   = StmtTypeDef TypeDef
+   | StmtFuncDef FuncDef
+   | StmtFuncImpl FuncImpl
+   deriving (Eq, Show)
+
+stmt :: Parser Stmt
+stmt = choice
+   [ try (StmtTypeDef    <$> typedef)
+   , try (StmtFuncDef    <$> funcdef)
+   , try (StmtFuncImpl   <$> funcImpl)
+   ]
 
 parse :: String -> Text -> IO ()
 parse fname input = putStrLn $
-   case runParser (xast <* eof) fname input of
+   case runParser (sc *> program <* eof) fname input of
       Left e -> "Got error:\n" <> errorBundlePretty e
       Right found -> show found

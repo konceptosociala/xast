@@ -22,7 +22,9 @@ library
         Xast.Parser.Ident,
         Xast.Parser.Type,
         Xast.Parser.Function,
-        Xast.Parser.Expr
+        Xast.Parser.Expr,
+        Xast.Parser.System,
+        Xast.Parser.Headers
     -- other-modules:
     -- other-extensions:
     build-depends:    

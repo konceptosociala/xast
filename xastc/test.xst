@@ -1,5 +1,8 @@
+module Test.XST exports {Tree, Node, myFunction}
 
--- Test.XST
+use My.Module1 as M
+use My.Module2 {imp1, Imp2}
+use My.Module3 *
 
 type Tree a 
    = Node {
@@ -33,5 +36,5 @@ fn add =
 
         add a b;
 
-fn apply1 = func (a b);
-fn apply2 = (func a) b;
+fn apply1 = M.func (a b);
+fn apply2 = (M.func a) b;

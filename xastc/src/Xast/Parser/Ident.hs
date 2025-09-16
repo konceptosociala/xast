@@ -1,13 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Xast.Parser.Ident 
+module Xast.Parser.Ident
    ( Ident(..)
    , typeIdent
    , fnIdent
    , genericIdent
    , varIdent
+   , operatorIdent
    ) where
-      
+
 import Data.Text (Text, pack)
 import GHC.Generics (Generic)
 import Text.Megaparsec.Char (upperChar, lowerChar, alphaNumChar)
@@ -22,6 +23,9 @@ instance Show Ident where
 
 keywords :: [Text]
 keywords = ["type", "fn", "let", "in", "if", "then", "else", "match", "of", "and"]
+
+operatorIdent :: Parser Ident
+operatorIdent = Ident . pack <$> some (oneOf ("!#$%&*+./<=>?@\\^|-~:" :: String))
 
 genericIdent :: Parser Ident
 genericIdent = lexeme $ do
