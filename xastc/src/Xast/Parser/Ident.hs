@@ -2,11 +2,9 @@
 
 module Xast.Parser.Ident
    ( Ident(..)
-   , typeIdent
-   , fnIdent
-   , genericIdent
-   , varIdent
-   , operatorIdent
+   , typeIdent, fnIdent, genericIdent, varIdent
+   , operator, opToFnIdent
+   , reserved
    ) where
 
 import Data.Text (Text, pack)
@@ -21,11 +19,65 @@ newtype Ident = Ident { unIdent :: Text }
 instance Show Ident where
    show = show . unIdent
 
-keywords :: [Text]
-keywords = ["type", "fn", "let", "in", "if", "then", "else", "match", "of", "and"]
+reserved :: [Text]
+reserved = 
+   -- Keywords
+   [ "type", "fn", "let", "in", "if", "then", "else"
+   , "match", "of", "and", "system", "with", "extern"
+   -- Functions
+   , "opAdd", "opSub", "opMul", "opDiv", "opMod"
+   , "opPow", "opEq", "opNeq", "opAnd", "opOr"
+   , "opPipe", "opConcat"
+   ]
 
-operatorIdent :: Parser Ident
-operatorIdent = Ident . pack <$> some (oneOf ("!#$%&*+./<=>?@\\^|-~:" :: String))
+data Operator 
+   -- Math
+   = OpPlus    -- +
+   | OpMinus   -- -
+   | OpMul     -- *
+   | OpDiv     -- /
+   | OpMod     -- %
+   | OpPow     -- **
+   -- Logical
+   | OpEq      -- ==
+   | OpNeq     -- !=
+   | OpAnd     -- &&
+   | OpOr      -- ||
+   -- Other
+   | OpPipe    -- |>
+   | OpConcat  -- <>
+   deriving (Eq, Show)
+
+operator :: Parser Operator
+operator = choice
+   [ OpPlus    <$ symbol "+"
+   , OpMinus   <$ symbol "-"
+   , OpMul     <$ symbol "*"
+   , OpDiv     <$ symbol "/"
+   , OpMod     <$ symbol "%"
+   , OpPow     <$ symbol "**"
+   , OpEq      <$ symbol "=="
+   , OpNeq     <$ symbol "!="
+   , OpAnd     <$ symbol "&&"
+   , OpOr      <$ symbol "||"
+   , OpPipe    <$ symbol "|>"
+   , OpConcat  <$ symbol "<>"
+   ]
+
+opToFnIdent :: Operator -> Ident
+opToFnIdent op = case op of
+   OpPlus    -> Ident "opAdd"
+   OpMinus   -> Ident "opSub"
+   OpMul     -> Ident "opMul"
+   OpDiv     -> Ident "opDiv"
+   OpMod     -> Ident "opMod"
+   OpPow     -> Ident "opPow"
+   OpEq      -> Ident "opEq"
+   OpNeq     -> Ident "opNeq"
+   OpAnd     -> Ident "opAnd"
+   OpOr      -> Ident "opOr"
+   OpPipe    -> Ident "opPipe"
+   OpConcat  -> Ident "opConcat"
 
 genericIdent :: Parser Ident
 genericIdent = lexeme $ do
@@ -38,15 +90,15 @@ typeIdent = pascalCase
 fnIdent :: Parser Ident
 fnIdent = try $ do
    ident <- camelCase
-   if unIdent ident `elem` keywords
-      then fail "keyword cannot be used as identifier"
+   if unIdent ident `elem` reserved
+      then fail "this ident is reserved"
       else return ident
 
 varIdent :: Parser Ident
 varIdent = try $ do
    ident <- camelCase
-   if unIdent ident `elem` keywords
-      then fail "keyword cannot be used as identifier"
+   if unIdent ident `elem` reserved
+      then fail "this ident is reserved"
       else return ident
 
 pascalCase :: Parser Ident

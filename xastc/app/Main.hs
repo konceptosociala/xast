@@ -7,7 +7,7 @@ import Data.Text (pack)
 
 main :: IO ()
 main = do
-  let filePath = "test.xst"
+  let filePath = "XastTestProject/Main.xst"
 
   fileContent <- readFile filePath
   Xast.parse filePath $ pack fileContent

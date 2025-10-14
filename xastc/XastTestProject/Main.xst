@@ -1,0 +1,10 @@
+module Main exports { UpdatePlayerPosition }
+
+use Components *
+
+extern type Renderer;
+extern fn drawCircle(Pos, Renderer) -> Renderer;
+
+type UpdatePlayerPosition = UpdatePlayerPosition;
+
+fn myFn(Int, List Bool) -> ();

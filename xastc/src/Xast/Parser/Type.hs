@@ -3,6 +3,7 @@
 
 module Xast.Parser.Type
    ( TypeDef(..), typedef
+   , ExternType(..), externType
    , Type(..), type', atomType
    , Field(..), field
    , Payload(..), payload
@@ -13,6 +14,22 @@ import Xast.Parser.Ident
 import Xast.Parser (Parser, symbol, lexeme, endOfStmt)
 import Text.Megaparsec (choice, sepBy, between, some, MonadParsec (try), many, sepBy1)
 import Data.Function ((&))
+
+data ExternType = ExternType
+   { etName :: Ident
+   , etGenerics :: [Ident]
+   }
+   deriving (Eq, Show)
+
+externType :: Parser ExternType
+externType = do
+   _           <- symbol "extern"
+   _           <- symbol "type"
+   etName      <- typeIdent
+   etGenerics  <- many genericIdent
+   _           <- endOfStmt
+
+   return ExternType {..}
 
 data TypeDef = TypeDef
    { tdName       :: Ident
