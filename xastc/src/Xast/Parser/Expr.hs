@@ -84,7 +84,7 @@ lambda = do
 
 data LetIn = LetIn
    { linBind :: [Let]
-   , libExpr :: Expr
+   , linExpr :: Expr
    }
    deriving (Eq, Show)
 
@@ -92,7 +92,7 @@ letIn :: Parser LetIn
 letIn = do
    linBind <- let' `sepBy1` symbol "and"
    _       <- symbol "in"
-   libExpr <- expr
+   linExpr <- expr
 
    return LetIn {..}
 

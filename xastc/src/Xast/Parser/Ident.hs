@@ -80,12 +80,17 @@ opToFnIdent op = case op of
    OpConcat  -> Ident "opConcat"
 
 genericIdent :: Parser Ident
-genericIdent = lexeme $ do
+genericIdent = try $ lexeme $ do
    c <- lowerChar
+   notFollowedBy alphaNumChar
    return $ Ident (pack [c])
 
 typeIdent :: Parser Ident
-typeIdent = pascalCase
+typeIdent = try $ do
+   ident <- pascalCase
+   if unIdent ident `elem` reserved
+      then fail "this ident is reserved"
+      else return ident
 
 fnIdent :: Parser Ident
 fnIdent = try $ do

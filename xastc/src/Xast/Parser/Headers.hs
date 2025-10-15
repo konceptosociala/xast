@@ -47,16 +47,16 @@ importDef = do
    return ImportDef {..}
 
 data ImportPayload
-   = IpAlias Ident
-   | IpSelect [Ident]
-   | IpFull
+   = ImpAlias Ident
+   | ImpSelect [Ident]
+   | ImpFull
    deriving (Eq, Show)
 
 importPayload :: Parser ImportPayload
 importPayload = choice
-   [ IpAlias   <$ symbol "as" <*> typeIdent
-   , IpSelect  <$> between (symbol "{") (symbol "}") (importIdent `sepBy1` symbol ",")
-   , IpFull    <$ symbol "*"
+   [ ImpAlias   <$ symbol "as" <*> typeIdent
+   , ImpSelect  <$> between (symbol "{") (symbol "}") (importIdent `sepBy1` symbol ",")
+   , ImpFull    <$ symbol "*"
    ]
 
 importIdent :: Parser Ident

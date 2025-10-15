@@ -1,12 +1,12 @@
 module Components exports { Pos, Velocity, Player }
 
 type Pos = Pos {
-    x : Int,
-    y : Int
+   x : Int,
+   y : Int
 };
 
 type Velocity = Velocity Int Int;
 
 type Player = Player;
 
-type UnexportedType = UnexportedType
+type UnexportedType = UnexportedType;

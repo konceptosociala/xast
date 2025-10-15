@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Xast.Parser.Function
-   ( FuncDef(..), funcdef
+   ( FuncDef(..), funcDef
    , ExternFunc(..), externFunc
    , FuncImpl(..), funcImpl
    , Pattern(..), pattern
@@ -25,10 +25,10 @@ externFunc :: Parser ExternFunc
 externFunc = do
    _        <- symbol "extern"
    _        <- symbol "fn"
-   efnName   <- fnIdent
-   efnArgs   <- between (symbol "(") (symbol ")") (type' `sepBy` symbol ",")
+   efnName  <- fnIdent
+   efnArgs  <- between (symbol "(") (symbol ")") (type' `sepBy` symbol ",")
    _        <- symbol "->"
-   efnRet    <- type'
+   efnRet   <- type'
    _        <- endOfStmt
 
    return ExternFunc {..}
@@ -41,8 +41,8 @@ data FuncDef = FuncDef
    }
    deriving (Eq, Show)
 
-funcdef :: Parser FuncDef
-funcdef = do
+funcDef :: Parser FuncDef
+funcDef = do
    _        <- symbol "fn"
    fdName   <- fnIdent
    fdArgs   <- between (symbol "(") (symbol ")") (type' `sepBy` symbol ",")

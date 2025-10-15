@@ -1,0 +1,4 @@
+module Renderer exports { Renderer, drawCircle }
+
+extern type Renderer;
+extern fn drawCircle(Pos, Renderer) -> Renderer;

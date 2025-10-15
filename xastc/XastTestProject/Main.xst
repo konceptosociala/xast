@@ -2,9 +2,7 @@ module Main exports { UpdatePlayerPosition }
 
 use Components *
 
-extern type Renderer;
-extern fn drawCircle(Pos, Renderer) -> Renderer;
+system UpdatePlayerPosition (Player, Pos, Velocity) 
+   -> (Position, List Effect);
 
-type UpdatePlayerPosition = UpdatePlayerPosition;
-
-fn myFn(Int, List Bool) -> ();
+system UpdatePlayerPosition p pos (Velocity velX velY) = (pos, Event (p, pos));

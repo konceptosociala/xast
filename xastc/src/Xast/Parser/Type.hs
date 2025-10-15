@@ -2,7 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module Xast.Parser.Type
-   ( TypeDef(..), typedef
+   ( TypeDef(..), typeDef
    , ExternType(..), externType
    , Type(..), type', atomType
    , Field(..), field
@@ -38,8 +38,8 @@ data TypeDef = TypeDef
    }
    deriving (Eq, Show)
 
-typedef :: Parser TypeDef
-typedef = do
+typeDef :: Parser TypeDef
+typeDef = do
    _           <- symbol "type"
    tdName      <- typeIdent
    tdGenerics  <- many genericIdent

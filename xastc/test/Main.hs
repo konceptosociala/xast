@@ -148,7 +148,7 @@ testParseCtor = TestCase $ do
 
 testParseTypeDef :: Test
 testParseTypeDef = TestCase $ do
-   assertParses typedef "type F = F (fn(Int) -> Bool) Int Bool"
+   assertParses typeDef "type F = F (fn(Int) -> Bool) Int Bool"
       (TypeDef
          (Ident "F")
          []
@@ -162,7 +162,7 @@ testParseTypeDef = TestCase $ do
             )
          ]
       )
-   assertParses typedef "type Maybe a = Just a | Nothing"
+   assertParses typeDef "type Maybe a = Just a | Nothing"
       (TypeDef 
          (Ident "Maybe")
          [Ident "a"]
@@ -207,7 +207,7 @@ testParseTypeDef = TestCase $ do
                PUnit
             ]
          
-   assertParses typedef 
+   assertParses typeDef 
       "type Tree a \
       \   = Node {\
       \      left : Maybe (Tree a),\
@@ -215,10 +215,10 @@ testParseTypeDef = TestCase $ do
       \   } \
       \   | Leaf"
       tree
-   assertParses typedef 
+   assertParses typeDef 
       "type Tree a = Node { left : Maybe (Tree a), right : Maybe (Tree a) } | Leaf"
       tree
-   assertFails typedef
+   assertFails typeDef
       "type Tree a \
       \   = Node {\
       \      left : Maybe (Tree a),\
@@ -227,13 +227,13 @@ testParseTypeDef = TestCase $ do
       \   | Leaf"
       
 
-   assertFails typedef "type Maybe a Just a | Nothing"
-   assertFails typedef "type Maybe a = Just a | "
-   assertFails typedef "type Maybe a = | Nothing"
+   assertFails typeDef "type Maybe a Just a | Nothing"
+   assertFails typeDef "type Maybe a = Just a | "
+   assertFails typeDef "type Maybe a = | Nothing"
 
 testParseFuncDef :: Test
 testParseFuncDef = TestCase $ do
-   assertParses funcdef "fn myFunc (Int, Maybe a, (Either a b, a)) -> String"
+   assertParses funcDef "fn myFunc (Int, Maybe a, (Either a b, a)) -> String"
       (FuncDef
          (Ident "myFunc")
          [ TyCon (Ident "Int")
@@ -247,15 +247,15 @@ testParseFuncDef = TestCase $ do
          ]
          (TyCon (Ident "String"))
       )
-   assertParses funcdef "fn doStuff () -> ()"
+   assertParses funcDef "fn doStuff () -> ()"
       (FuncDef
          (Ident "doStuff")
          []
          (TyTuple [])
       )
-   assertFails funcdef "fn MyFunc (Int) -> Bool"      -- invalid function name (should be lowercase)
-   assertFails funcdef "fn myFunc Int -> Bool"        -- missing parentheses
-   assertFails funcdef "fn myFunc (Int, Bool) Bool"   -- missing '->'
+   assertFails funcDef "fn MyFunc (Int) -> Bool"      -- invalid function name (should be lowercase)
+   assertFails funcDef "fn myFunc Int -> Bool"        -- missing parentheses
+   assertFails funcDef "fn myFunc (Int, Bool) Bool"   -- missing '->'
 
 testParseLiteral :: Test
 testParseLiteral = TestCase $ do
@@ -335,8 +335,8 @@ tests = TestList
    , TestLabel "Parse field" testParseField
    , TestLabel "Parse payload" testParsePayload
    , TestLabel "Parse ctor" testParseCtor
-   , TestLabel "Parse typedef" testParseTypeDef
-   , TestLabel "Parse funcdef" testParseFuncDef
+   , TestLabel "Parse typeDef" testParseTypeDef
+   , TestLabel "Parse funcDef" testParseFuncDef
    , TestLabel "Parse literals" testParseLiteral
    , TestLabel "Parse patterns" testParsePattern
    ]
