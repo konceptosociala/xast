@@ -4,6 +4,7 @@
 module Xast.Parser.System
    ( SystemDef(..), systemDef
    , SystemImpl(..), systemImpl
+   , System(..), system
    ) where
 
 import Xast.Parser
@@ -13,7 +14,18 @@ import Xast.Parser.Function (Pattern, pattern)
 import Xast.Parser.Expr (stringLiteral, Expr, expr)
 import Data.Text (Text)
 import Control.Applicative (optional)
-import Text.Megaparsec (between, sepBy, sepBy1, (<|>), many, some)
+import Text.Megaparsec (between, sepBy, sepBy1, (<|>), many, some, (<?>), MonadParsec (lookAhead))
+import Data.Maybe (isJust)
+
+data System = SysDef SystemDef | SysImpl SystemImpl
+   deriving (Eq, Show)
+
+system :: Parser System
+system = do
+   hasLabel <- lookAhead (optional (symbol "@label"))
+   if isJust hasLabel
+      then SysDef <$> systemDef
+      else (SysDef <$> systemDef) <-> (SysImpl <$> systemImpl)
 
 data SystemDef = SystemDef
    { sysLabel :: Text
@@ -26,7 +38,7 @@ data SystemDef = SystemDef
 
 systemDef :: Parser SystemDef
 systemDef = do
-   sysLabel <- label <|> pure "default"
+   sysLabel <- (label <|> pure "default") <?> "system label"
    _        <- symbol "system"
    sysName  <- typeIdent
    sysArgs  <- between (symbol "(") (symbol ")") (type' `sepBy` symbol ",")
@@ -43,7 +55,7 @@ label = symbol "@label" *> symbol "=" *> stringLiteral
 
 with :: Parser [Type]
 with = symbol "with" *> (event `sepBy1` symbol ",")
-   where 
+   where
       event :: Parser Type
       event = symbol "Event" *> type'
 

@@ -3,35 +3,22 @@
 
 module Xast.Parser.Function
    ( FuncDef(..), funcDef
-   , ExternFunc(..), externFunc
    , FuncImpl(..), funcImpl
    , Pattern(..), pattern
+   , Func(..), func
    ) where
-      
+
 import Xast.Parser.Type (Type, type')
 import Xast.Parser.Ident (Ident, fnIdent, varIdent, typeIdent)
 import Xast.Parser.Expr (Literal, literal, Expr, expr)
 import Xast.Parser
 import Text.Megaparsec (between, sepBy, choice, MonadParsec (try), many)
 
-data ExternFunc = ExternFunc
-   { efnName :: Ident
-   , efnArgs :: [Type]
-   , efnRet :: Type
-   }
+data Func = FnDef FuncDef | FnImpl FuncImpl
    deriving (Eq, Show)
 
-externFunc :: Parser ExternFunc
-externFunc = do
-   _        <- symbol "extern"
-   _        <- symbol "fn"
-   efnName  <- fnIdent
-   efnArgs  <- between (symbol "(") (symbol ")") (type' `sepBy` symbol ",")
-   _        <- symbol "->"
-   efnRet   <- type'
-   _        <- endOfStmt
-
-   return ExternFunc {..}
+func :: Parser Func
+func = (FnDef <$> funcDef) <-> (FnImpl <$> funcImpl)
 
 -- fn myFunc (Type1, Type2) -> TypeReturn
 data FuncDef = FuncDef

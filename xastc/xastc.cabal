@@ -24,13 +24,15 @@ library
         Xast.Parser.Function,
         Xast.Parser.Expr,
         Xast.Parser.System,
-        Xast.Parser.Headers
+        Xast.Parser.Headers,
+        Xast.Parser.Extern
     -- other-modules:
     -- other-extensions:
     build-depends:    
         base ^>=4.18.3.0,
         megaparsec ==9.7.0,
-        text ==2.0.2
+        text ==2.0.2,
+        containers ==0.6.7
     hs-source-dirs:   src
     default-language: GHC2021
 

@@ -20,6 +20,8 @@ type ModBind = Maybe Ident
 data Expr
    = ExpVar ModBind Ident                 -- add, a
    | ExpCon ModBind Ident                 -- Nothing, Just
+   | ExpTuple [Expr]                      -- (pos, Event (p, pos));
+   -- | ExpList [Expr]                       -- [a, 12, b, c]
    | ExpLit Literal                       -- "abc", 12, ()
    | ExpLambda Lambda                     -- .\x y -> x + y
    | ExpApp Expr Expr                     -- Just 12, func a b
@@ -30,17 +32,23 @@ data Expr
 
 atomExpr :: Parser Expr
 atomExpr = choice
-   [ parens
+   [ tupleOrParens
    , ExpVar    <$> (optional . try $ typeIdent <* ".") <*> varIdent
    , ExpCon    <$> (optional . try $ typeIdent <* ".") <*> typeIdent
+   -- , ExpList   <$> between (symbol "[") (symbol "]") expr `sepBy` symbol ","
    , ExpLit    <$> literal
    , ExpLambda <$> lambda
    , ExpLetIn  <$> letIn
    , ExpIfThen <$> ifThenElse
    ]
 
-parens :: Parser Expr
-parens = between (symbol "(") (symbol ")") expr
+tupleOrParens :: Parser Expr
+tupleOrParens = between (symbol "(") (symbol ")") $ do
+   ts <- expr `sepBy` symbol ","
+   case ts of
+      [] -> pure (ExpTuple [])
+      [t] -> pure t
+      manyT -> pure (ExpTuple manyT)
 
 expr :: Parser Expr
 expr = do
@@ -122,7 +130,7 @@ data Literal
 
 literal :: Parser Literal
 literal = choice
-   [ tupleOrParens
+   [ tupleOrParensLit
    , LitString <$> stringLiteral
    , LitChar   <$> charLiteral
    , LitFloat  <$> try signedFloat
@@ -130,8 +138,8 @@ literal = choice
    , LitList   <$> between (symbol "[") (symbol "]") (literal `sepBy` symbol ",")
    ]
 
-tupleOrParens :: Parser Literal
-tupleOrParens = between (symbol "(") (symbol ")") $ do
+tupleOrParensLit :: Parser Literal
+tupleOrParensLit = between (symbol "(") (symbol ")") $ do
    ts <- literal `sepBy` symbol ","
    case ts of
       [] -> pure (LitTuple [])

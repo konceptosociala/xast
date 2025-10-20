@@ -3,13 +3,14 @@
 module Xast (parse) where
 
 import Data.Text (Text, unpack)
-import Text.Megaparsec (choice, runParser, MonadParsec (eof, try), errorBundlePretty, some, many, (<|>))
-import Xast.Parser.Type (TypeDef, typeDef, ExternType, externType)
-import Xast.Parser.Function (FuncDef, funcDef, FuncImpl, funcImpl, ExternFunc, externFunc)
+import Text.Megaparsec (runParser, MonadParsec (eof, lookAhead), errorBundlePretty, some, many, (<|>))
+import Xast.Parser.Type (TypeDef, typeDef)
+import Xast.Parser.Function (Func, func)
 import Xast.Parser (Parser, sc, symbol)
 import Xast.Parser.Headers (ModuleDef, ImportDef, moduleDef, importDef)
 import Xast.Parser.Expr (stringLiteral)
-import Xast.Parser.System (SystemDef, systemDef, SystemImpl, systemImpl)
+import Xast.Parser.System (System, system)
+import Xast.Parser.Extern
 
 data Program = Program
    { progMode :: Mode
@@ -43,24 +44,23 @@ mode = do
 
 data Stmt
    = StmtTypeDef TypeDef
-   | StmtExternType ExternType
-   | StmtFuncDef FuncDef
-   | StmtExternFunc ExternFunc
-   | StmtFuncImpl FuncImpl
-   | StmtSystemDef SystemDef
-   | StmtSystemImpl SystemImpl
+   | StmtFunc Func
+   | StmtExtern Extern
+   | StmtSystem System
    deriving (Eq, Show)
 
+stmtKeyword :: Parser Text
+stmtKeyword = "extern" <|> "fn" <|> "type" <|> "system"
+
 stmt :: Parser Stmt
-stmt = choice
-   [ try (StmtExternType <$> externType)
-   , try (StmtExternFunc <$> externFunc)
-   , try (StmtTypeDef    <$> typeDef)
-   , try (StmtFuncDef    <$> funcDef)
-   , try (StmtFuncImpl   <$> funcImpl)
-   , try (StmtSystemDef  <$> systemDef)
-   , try (StmtSystemImpl <$> systemImpl)
-   ]
+stmt = do
+   tok <- lookAhead stmtKeyword
+   case tok of
+      "extern" -> StmtExtern  <$> extern
+      "fn"     -> StmtFunc    <$> func
+      "type"   -> StmtTypeDef <$> typeDef
+      "system" -> StmtSystem  <$> system
+      _        -> fail "expected \"extern\", \"fn\", \"type\", \"system\""
 
 parse :: String -> Text -> IO ()
 parse fname input = putStrLn $

@@ -2,7 +2,28 @@ module Main exports { UpdatePlayerPosition }
 
 use Components *
 
-system UpdatePlayerPosition (Player, Pos, Velocity) 
-   -> (Position, List Effect);
+--system UpdatePlayerPosition (Player, Pos, Velocity) 
+--   -> (Position, List Effect);
 
-system UpdatePlayerPosition p pos (Velocity velX velY) = (pos, Event (p, pos));
+--system UpdatePlayerPosition p pos (Velocity velX velY) = (pos, Event (p, pos));
+
+-- extern fn yaSosuBibu(Int, Bool) -> ();
+
+-- extern type YaDaun s a;
+
+fn myFunction(Bool, Int) -> Tree Int;
+fn myFunction _ 0 = Leaf 0;
+fn myFunction a b =
+   if a
+   then Leaf b
+   else Leaf 0;
+
+fn add() -> Int;
+fn add =
+    let a = 1 and
+    let b = 2 in
+
+        add a b;
+
+fn apply1 = M.func a (a b);
+fn apply2 = (M.func a) b;
