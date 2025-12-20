@@ -1,13 +1,12 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Main where
 
-import qualified Xast (parse)
-import Data.Text (pack)
+import Xast (runCompile)
+import System.Environment (getArgs)
 
 main :: IO ()
 main = do
-  let filePath = "XastTestProject/Main.xst"
-
-  fileContent <- readFile filePath
-  Xast.parse filePath $ pack fileContent
+   args <- getArgs
+   case args of
+      [] -> runCompile Nothing
+      [dir] -> runCompile (Just dir)
+      _ -> putStrLn "Usage: xastc [project_directory]"

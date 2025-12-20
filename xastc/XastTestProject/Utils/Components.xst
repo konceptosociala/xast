@@ -1,4 +1,4 @@
-module Components exports { Pos, Velocity, Player }
+module Utils.Components exports { Pos, Velocity, Player }
 
 type Pos = Pos {
    x : Int,

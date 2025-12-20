@@ -27,3 +27,6 @@ fn add =
 
 fn apply1 = M.func a (a b);
 fn apply2 = (M.func a) b;
+
+-- XST -> Xast Source Text
+-- XBC -> Xast Bytecode

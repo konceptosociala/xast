@@ -10,19 +10,19 @@ module Xast.Parser.Type
    ) where
 
 import Xast.Parser.Ident
-import Xast.Parser (Parser, symbol, lexeme, endOfStmt)
+import Xast.Parser (Parser, symbol, lexeme, endOfStmt, Located, located)
 import Text.Megaparsec (choice, sepBy, between, some, MonadParsec (try), many, sepBy1)
 import Data.Function ((&))
 
 data TypeDef = TypeDef
    { tdName       :: Ident
    , tdGenerics   :: [Ident]
-   , tdCtors      :: [Ctor]
+   , tdCtors      :: [Located Ctor]
    }
    deriving (Eq, Show)
 
-typeDef :: Parser TypeDef
-typeDef = do
+typeDef :: Parser (Located TypeDef)
+typeDef = located $ do
    _           <- symbol "type"
    tdName      <- typeIdent
    tdGenerics  <- many genericIdent
@@ -38,8 +38,8 @@ data Ctor = Ctor
    }
    deriving (Eq, Show)
 
-ctor :: Parser Ctor
-ctor = do
+ctor :: Parser (Located Ctor)
+ctor = located $ do
    ctorName    <- typeIdent
    ctorPayload <- payload
    return Ctor {..}

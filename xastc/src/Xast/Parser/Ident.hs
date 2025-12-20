@@ -7,7 +7,7 @@ module Xast.Parser.Ident
    , reserved
    ) where
 
-import Data.Text (Text, pack)
+import Data.Text (Text, pack, unpack)
 import GHC.Generics (Generic)
 import Text.Megaparsec.Char (upperChar, lowerChar, alphaNumChar)
 import Text.Megaparsec
@@ -17,7 +17,7 @@ newtype Ident = Ident { unIdent :: Text }
    deriving (Eq, Ord, Generic)
 
 instance Show Ident where
-   show = show . unIdent
+   show = unpack . unIdent
 
 reserved :: [Text]
 reserved = 

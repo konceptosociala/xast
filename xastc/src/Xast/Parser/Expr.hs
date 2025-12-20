@@ -10,7 +10,7 @@ module Xast.Parser.Expr
 
 import Data.Text (Text, pack)
 import Xast.Parser.Ident (Ident, varIdent, typeIdent)
-import Xast.Parser (Parser, lexeme, sc, symbol)
+import Xast.Parser (Parser, lexeme, sc, symbol, Located(..), located)
 import Text.Megaparsec (choice, manyTill, between, sepBy, MonadParsec (try), some, sepBy1, optional)
 import qualified Text.Megaparsec.Char.Lexer as L
 import Text.Megaparsec.Char (char)
@@ -20,18 +20,18 @@ type ModBind = Maybe Ident
 data Expr
    = ExpVar ModBind Ident                 -- add, a
    | ExpCon ModBind Ident                 -- Nothing, Just
-   | ExpTuple [Expr]                      -- (pos, Event (p, pos));
+   | ExpTuple [Located Expr]              -- (pos, Event (p, pos));
    -- | ExpList [Expr]                       -- [a, 12, b, c]
    | ExpLit Literal                       -- "abc", 12, ()
    | ExpLambda Lambda                     -- .\x y -> x + y
-   | ExpApp Expr Expr                     -- Just 12, func a b
+   | ExpApp (Located Expr) (Located Expr) -- Just 12, func a b
    | ExpLetIn LetIn                       -- let a = 1 and let b = 2 in ...
    | ExpIfThen IfThenElse                 -- if ... then ... else ...
    -- | ExpMatch Match                    -- match EXPR of 
    deriving (Eq, Show)
 
-atomExpr :: Parser Expr
-atomExpr = choice
+atomExpr :: Parser (Located Expr)
+atomExpr = located $ choice
    [ tupleOrParens
    , ExpVar    <$> (optional . try $ typeIdent <* ".") <*> varIdent
    , ExpCon    <$> (optional . try $ typeIdent <* ".") <*> typeIdent
@@ -47,20 +47,20 @@ tupleOrParens = between (symbol "(") (symbol ")") $ do
    ts <- expr `sepBy` symbol ","
    case ts of
       [] -> pure (ExpTuple [])
-      [t] -> pure t
+      [Located _ t] -> pure t
       manyT -> pure (ExpTuple manyT)
 
-expr :: Parser Expr
+expr :: Parser (Located Expr)
 expr = do
    atoms <- some atomExpr
-   pure (foldl1 ExpApp atoms)
+   return $ foldl1 (\l r -> Located undefined (ExpApp l r)) atoms
 
 -- data Match = Match deriving (Eq, Show)
 
 data IfThenElse = IfThenElse
-   { iteIf :: Expr
-   , iteThen :: Expr
-   , iteElse :: Expr
+   { iteIf :: Located Expr
+   , iteThen :: Located Expr
+   , iteElse :: Located Expr
    }
    deriving (Eq, Show)
 
@@ -77,7 +77,7 @@ ifThenElse = do
 
 data Lambda = Lambda
    { lamArgs :: [Ident]
-   , lamBody :: Expr
+   , lamBody :: Located Expr
    }
    deriving (Eq, Show)
 
@@ -91,8 +91,8 @@ lambda = do
    return Lambda {..}
 
 data LetIn = LetIn
-   { linBind :: [Let]
-   , linExpr :: Expr
+   { linBind :: [Located Let]
+   , linExpr :: Located Expr
    }
    deriving (Eq, Show)
 
@@ -106,12 +106,12 @@ letIn = do
 
 data Let = Let
    { letIdent :: Ident
-   , letValue :: Expr
+   , letValue :: Located Expr
    }
    deriving (Eq, Show)
 
-let' :: Parser Let
-let' = do
+let' :: Parser (Located Let)
+let' = located $ do
    _         <- symbol "let"
    letIdent  <- varIdent
    _         <- symbol "="

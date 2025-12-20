@@ -6,7 +6,7 @@
 
 This project consists of 3 parts:
 
-* `xastc` is a Xast compiler, which is both library and executable, used to compile Xast Source Type files (`.xst`) to Xast Bytecode (`.xbc`);
+* `xastc` is a Xast compiler, which is both library and executable, used to compile Xast Source Text files (`.xst`) to Xast Bytecode (`.xbc`);
 
 * `xastvm` is a bytecode virtual machine library, bundled with internal ECS world, used in games, engines and runtimes;
 

@@ -17,7 +17,7 @@ import Control.Applicative (optional)
 import Text.Megaparsec (between, sepBy, sepBy1, (<|>), many, some, (<?>), MonadParsec (lookAhead))
 import Data.Maybe (isJust)
 
-data System = SysDef SystemDef | SysImpl SystemImpl
+data System = SysDef (Located SystemDef) | SysImpl (Located SystemImpl)
    deriving (Eq, Show)
 
 system :: Parser System
@@ -36,8 +36,8 @@ data SystemDef = SystemDef
    }
    deriving (Eq, Show)
 
-systemDef :: Parser SystemDef
-systemDef = do
+systemDef :: Parser (Located SystemDef)
+systemDef = located $ do
    sysLabel <- (label <|> pure "default") <?> "system label"
    _        <- symbol "system"
    sysName  <- typeIdent
@@ -63,12 +63,12 @@ data SystemImpl = SystemImpl
    { sysImName :: Ident
    , sysImArgs :: [Pattern]
    , sysImWith :: Maybe [Pattern]
-   , sysImBody :: Expr
+   , sysImBody :: Located Expr
    }
    deriving (Eq, Show)
 
-systemImpl :: Parser SystemImpl
-systemImpl = do
+systemImpl :: Parser (Located SystemImpl)
+systemImpl = located $ do
    _           <- symbol "system"
    sysImName   <- typeIdent
    sysImArgs   <- many pattern

@@ -8,11 +8,16 @@ module Xast.Parser.Headers
    ) where
 
 import Xast.Parser.Ident (Ident, typeIdent, fnIdent)
-import Xast.Parser (Parser, symbol)
+import Xast.Parser (Parser, symbol, Located, located)
 import Text.Megaparsec (sepBy1, between, (<|>), choice)
 
 newtype Module = Module [Ident]
-   deriving (Eq, Show)
+   deriving Eq
+
+instance Show Module where
+   show (Module []) = undefined
+   show (Module [x]) = show x
+   show (Module (x:xs)) = show x ++ "." ++ show (Module xs)
 
 module' :: Parser Module
 module' = Module <$> typeIdent `sepBy1` "."
@@ -23,8 +28,8 @@ data ModuleDef = ModuleDef
    }
    deriving (Eq, Show)
 
-moduleDef :: Parser ModuleDef
-moduleDef = do
+moduleDef :: Parser (Located ModuleDef)
+moduleDef = located $ do
    _        <- symbol "module"
    mdName   <- module'
    _        <- symbol "exports"
@@ -38,8 +43,8 @@ data ImportDef = ImportDef
    }
    deriving (Eq, Show)
 
-importDef :: Parser ImportDef
-importDef = do
+importDef :: Parser (Located ImportDef)
+importDef = located $ do
    _           <- symbol "use"
    imdMod      <- module'
    imdPayload  <- importPayload

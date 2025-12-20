@@ -14,7 +14,7 @@ import Xast.Parser.Expr (Literal, literal, Expr, expr)
 import Xast.Parser
 import Text.Megaparsec (between, sepBy, choice, MonadParsec (try), many)
 
-data Func = FnDef FuncDef | FnImpl FuncImpl
+data Func = FnDef (Located FuncDef) | FnImpl (Located FuncImpl)
    deriving (Eq, Show)
 
 func :: Parser Func
@@ -28,8 +28,8 @@ data FuncDef = FuncDef
    }
    deriving (Eq, Show)
 
-funcDef :: Parser FuncDef
-funcDef = do
+funcDef :: Parser (Located FuncDef)
+funcDef = located $ do
    _        <- symbol "fn"
    fdName   <- fnIdent
    fdArgs   <- between (symbol "(") (symbol ")") (type' `sepBy` symbol ",")
@@ -43,12 +43,12 @@ funcDef = do
 data FuncImpl = FuncImpl
    { fnName :: Ident
    , fnArgs :: [Pattern]
-   , fnBody :: Expr
+   , fnBody :: Located Expr
    }
    deriving (Eq, Show)
 
-funcImpl :: Parser FuncImpl
-funcImpl = do
+funcImpl :: Parser (Located FuncImpl)
+funcImpl = located $ do
    _        <- symbol "fn"
    fnName   <- fnIdent
    fnArgs   <- many pattern

@@ -9,10 +9,10 @@ module Xast.Parser.Extern
 
 import Xast.Parser.Type (Type, type')
 import Xast.Parser.Ident
-import Xast.Parser (endOfStmt, Parser, symbol, (<->))
+import Xast.Parser (endOfStmt, Parser, symbol, (<->), Located, located)
 import Text.Megaparsec (sepBy, between, many)
 
-data Extern = ExtFunc ExternFunc | ExtType ExternType
+data Extern = ExtFunc (Located ExternFunc) | ExtType (Located ExternType)
    deriving (Eq, Show)
 
 extern :: Parser Extern
@@ -25,8 +25,8 @@ data ExternFunc = ExternFunc
    }
    deriving (Eq, Show)
 
-externFunc :: Parser ExternFunc
-externFunc = do
+externFunc :: Parser (Located ExternFunc)
+externFunc = located $ do
    _        <- symbol "extern"
    _        <- symbol "fn"
    efnName  <- fnIdent
@@ -43,8 +43,8 @@ data ExternType = ExternType
    }
    deriving (Eq, Show)
 
-externType :: Parser ExternType
-externType = do
+externType :: Parser (Located ExternType)
+externType = located $ do
    _           <- symbol "extern"
    _           <- symbol "type"
    etName      <- typeIdent
