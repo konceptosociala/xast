@@ -17,11 +17,10 @@ import Data.Void (Void)
 parseProgram :: String -> Text -> Either (ParseErrorBundle Text Void) Program
 parseProgram = runParser (sc *> program <* eof)
 
-data Program = Program
+data Program = Program 
    { progMode :: Mode
    , progModuleDef :: Located ModuleDef
    , progImports :: [Located ImportDef]
-   , progForeign :: [Program]
    , progStmts :: [Stmt]
    }
    deriving (Eq, Show)
@@ -33,7 +32,7 @@ program = do
    progImports    <- many importDef
    progStmts      <- some stmt
 
-   return Program { progForeign = [], .. }
+   return Program { .. }
 
 data Mode = MStrict | MSafe | MDynamic
    deriving (Eq, Show)

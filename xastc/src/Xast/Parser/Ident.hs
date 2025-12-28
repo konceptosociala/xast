@@ -2,7 +2,7 @@
 
 module Xast.Parser.Ident
    ( Ident(..)
-   , typeIdent, fnIdent, genericIdent, varIdent
+   , typeIdent, fnIdent, genericIdent, varIdent, inferIdent
    , operator, opToFnIdent
    , reserved
    ) where
@@ -17,6 +17,7 @@ newtype Ident = Ident { unIdent :: Text }
    deriving (Eq, Ord, Generic)
 
 instance Show Ident where
+   show :: Ident -> String
    show = unpack . unIdent
 
 reserved :: [Text]
@@ -86,24 +87,23 @@ genericIdent = try $ lexeme $ do
    return $ Ident (pack [c])
 
 typeIdent :: Parser Ident
-typeIdent = try $ do
-   ident <- pascalCase
-   if unIdent ident `elem` reserved
-      then fail "this ident is reserved"
-      else return ident
+typeIdent = try pascalCase
+
+inferIdent :: Parser Ident
+inferIdent = try $ Ident <$> symbol "_"
 
 fnIdent :: Parser Ident
 fnIdent = try $ do
    ident <- camelCase
    if unIdent ident `elem` reserved
-      then fail "this ident is reserved"
+      then fail ("keyword `" ++ unpack (unIdent ident) ++ "` is reserved")
       else return ident
 
 varIdent :: Parser Ident
 varIdent = try $ do
    ident <- camelCase
    if unIdent ident `elem` reserved
-      then fail "this ident is reserved"
+      then fail ("keyword `" ++ unpack (unIdent ident) ++ "` is reserved")
       else return ident
 
 pascalCase :: Parser Ident

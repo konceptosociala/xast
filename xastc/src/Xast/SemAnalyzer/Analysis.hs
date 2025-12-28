@@ -16,16 +16,16 @@ import Xast.Parser.Headers (ModuleDef(ModuleDef))
 -- checkTypes :: Program -> SemAnalyzer ()
 -- checkTypes 
 
-resolveSameModuleNames :: Program -> SemAnalyzer ()
-resolveSameModuleNames (Program _ (Located _ (ModuleDef this _)) _ progs _) = 
-   when (any (\(Program _ (Located _ (ModuleDef other _)) _ _ _) -> this == other) progs)
-      $ undefined
+-- resolveSameModuleNames :: Program -> SemAnalyzer ()
+-- resolveSameModuleNames (Program _ (Located _ (ModuleDef this _)) _ progs _) = 
+--    when (any (\(Program _ (Located _ (ModuleDef other _)) _ _ _) -> this == other) progs)
+--       $ undefined
 
-resolveCyclicImports :: Program -> SemAnalyzer ()
-resolveCyclicImports (Program _ (Located _ (ModuleDef this _)) _ _ _) = return ()
+-- resolveCyclicImports :: Program -> SemAnalyzer ()
+-- resolveCyclicImports (Program _ (Located _ (ModuleDef this _)) _ _ _) = return ()
 
 declareStmts :: Program -> SemAnalyzer ()
-declareStmts (Program _ _ _ _ stmts) = mapM_ declareStmt stmts
+declareStmts (Program _ _ _ stmts) = mapM_ declareStmt stmts
 
 declareStmt :: Stmt -> SemAnalyzer ()
 declareStmt stmt = case stmt of

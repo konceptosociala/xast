@@ -24,7 +24,7 @@ module' = Module <$> typeIdent `sepBy1` "."
 
 data ModuleDef = ModuleDef
    { mdName :: Module
-   , mdExport :: [Ident]
+   , mdExport :: ExportPayload
    }
    deriving (Eq, Show)
 
@@ -33,9 +33,20 @@ moduleDef = located $ do
    _        <- symbol "module"
    mdName   <- module'
    _        <- symbol "exports"
-   mdExport <- between (symbol "{") (symbol "}") ((typeIdent <|> fnIdent) `sepBy1` symbol ",")
+   mdExport <- exportPayload
 
    return ModuleDef {..}
+
+data ExportPayload
+   = ExpFull
+   | ExpSelect [Ident]
+   deriving (Eq, Show)
+
+exportPayload :: Parser ExportPayload
+exportPayload = choice
+   [ ExpSelect <$> between (symbol "{") (symbol "}") ((typeIdent <|> fnIdent) `sepBy1` symbol ",")
+   , ExpFull   <$ symbol "*"
+   ]
 
 data ImportDef = ImportDef
    { imdMod :: Module

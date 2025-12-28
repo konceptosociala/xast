@@ -24,6 +24,8 @@ runCompile dir = do
    code <- readFile mainFile
    let parsed = parseProgram mainFile (pack code)
 
+   print parsed
+
    case parsed of
       Left err -> putStrLn $ "Parse error:\n" <> errorBundlePretty err
       Right ast -> do

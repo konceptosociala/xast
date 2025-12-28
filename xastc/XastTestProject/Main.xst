@@ -2,14 +2,30 @@ module Main exports { UpdatePlayerPosition }
 
 use Components *
 
---system UpdatePlayerPosition (Player, Pos, Velocity) 
---   -> (Position, List Effect);
+system UpdatePlayerPosition #(Player, Pos, Velocity) 
+    -> (Pos, List Effect);
 
---system UpdatePlayerPosition p pos (Velocity velX velY) = (pos, Event (p, pos));
+-- Is OK
+system EnemyFollowPlayer
+    #(Player, Pos)
+    #(Enemy, Pos, Velocity)
+    -> (Enemy, Velocity)
 
--- extern fn yaSosuBibu(Int, Bool) -> ();
+-- Return component is ambiguous
+system InvalidReturn
+    #(Player, Pos)
+    #(Enemy, Pos, Velocity)
+    -> Pos
 
--- extern type YaDaun s a;
+system MultipleEntitiesWithSideEffectsEventsAndResources
+    #(Player, Pos)
+    #(Enemy, Pos)
+    -> ((Enemy, Pos), List Effect)
+        with
+            event: (CustomEvent, OtherEvent),
+            resource: PhysicsHandler
+
+system UpdatePlayerPosition #(p pos (Velocity velX velY)) = (pos, Event (p, pos));
 
 fn myFunction(Bool, Int) -> Tree Int;
 fn myFunction _ 0 = Leaf 0;
@@ -21,7 +37,8 @@ fn myFunction a b =
 fn add() -> Int;
 fn add =
     let a = 1 and
-    let b = 2 in
+    let b = 2 and 
+    let _ = [12, 4, 142] in
 
         add a b;
 

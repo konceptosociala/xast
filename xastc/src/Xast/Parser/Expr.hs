@@ -9,9 +9,9 @@ module Xast.Parser.Expr
    ) where
 
 import Data.Text (Text, pack)
-import Xast.Parser.Ident (Ident, varIdent, typeIdent)
+import Xast.Parser.Ident (Ident, varIdent, typeIdent, inferIdent)
 import Xast.Parser (Parser, lexeme, sc, symbol, Located(..), located)
-import Text.Megaparsec (choice, manyTill, between, sepBy, MonadParsec (try), some, sepBy1, optional)
+import Text.Megaparsec (choice, manyTill, between, sepBy, MonadParsec (try), some, sepBy1, optional, getSourcePos, (<|>))
 import qualified Text.Megaparsec.Char.Lexer as L
 import Text.Megaparsec.Char (char)
 
@@ -21,7 +21,7 @@ data Expr
    = ExpVar ModBind Ident                 -- add, a
    | ExpCon ModBind Ident                 -- Nothing, Just
    | ExpTuple [Located Expr]              -- (pos, Event (p, pos));
-   -- | ExpList [Expr]                       -- [a, 12, b, c]
+   | ExpList [Located Expr]               -- [a, 12, b, c]
    | ExpLit Literal                       -- "abc", 12, ()
    | ExpLambda Lambda                     -- .\x y -> x + y
    | ExpApp (Located Expr) (Located Expr) -- Just 12, func a b
@@ -35,7 +35,7 @@ atomExpr = located $ choice
    [ tupleOrParens
    , ExpVar    <$> (optional . try $ typeIdent <* ".") <*> varIdent
    , ExpCon    <$> (optional . try $ typeIdent <* ".") <*> typeIdent
-   -- , ExpList   <$> between (symbol "[") (symbol "]") expr `sepBy` symbol ","
+   , ExpList   <$> between (symbol "[") (symbol "]") (expr `sepBy` symbol ",")
    , ExpLit    <$> literal
    , ExpLambda <$> lambda
    , ExpLetIn  <$> letIn
@@ -53,7 +53,8 @@ tupleOrParens = between (symbol "(") (symbol ")") $ do
 expr :: Parser (Located Expr)
 expr = do
    atoms <- some atomExpr
-   return $ foldl1 (\l r -> Located undefined (ExpApp l r)) atoms
+   pos <- getSourcePos
+   return $ foldl1 (\l r -> Located pos (ExpApp l r)) atoms
 
 -- data Match = Match deriving (Eq, Show)
 
@@ -84,7 +85,7 @@ data Lambda = Lambda
 lambda :: Parser Lambda
 lambda = do
    _        <- symbol ".\\"
-   lamArgs  <- some varIdent
+   lamArgs  <- some (varIdent <|> inferIdent)
    _        <- symbol "->"
    lamBody  <- expr
 
@@ -113,7 +114,7 @@ data Let = Let
 let' :: Parser (Located Let)
 let' = located $ do
    _         <- symbol "let"
-   letIdent  <- varIdent
+   letIdent  <- varIdent <|> inferIdent
    _         <- symbol "="
    letValue  <- expr
 
