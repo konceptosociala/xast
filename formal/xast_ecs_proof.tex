@@ -59,7 +59,7 @@ where:
 \end{equation*}
 where:
 \begin{enumerate}\itemsep=0pt
-    \item Event is a tuple $(e, C)$ where $e$ is an entity identifier and $C$ is a finite component set, associated with $e$;
+    \item Event is a finite set of components $C$;
     \item $\operatorname{Seq}(\text{Event})$ denotes an ordered sequence, allowing only sequential access.
 \end{enumerate}
 
@@ -84,7 +84,7 @@ In worst case, if $\operatorname{\textbf{choose}}$ need to scan all the players,
     T_\text{R} = \text{O}(n \cdot m).
 \end{equation*}
 
-Let Event --- a tuple: $(\text{Player}, \text{Transform})$.
+Let Event be a tuple: $(\text{Player}, \text{Transform})$.
 Event-driven model system will be
 \begin{align*}
     \text{System}_{\text{E}} \colon \space \forall e &\in E\colon\\
