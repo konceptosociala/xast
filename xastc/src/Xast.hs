@@ -5,7 +5,7 @@ module Xast (runCompile) where
 import Data.Text (pack)
 import Data.List (dropWhileEnd)
 import System.Directory (getCurrentDirectory, doesFileExist)
-import Control.Monad (unless)
+import Control.Monad (unless, forM_)
 import Xast.Parser.Config (parseConfig, XastConfiguration (xcModules))
 import Control.Monad.Except
 import Control.Monad.IO.Class (MonadIO(liftIO))
@@ -35,7 +35,9 @@ runCompile_ dir = runExceptT $ do
    -- Parse modules
    _modules <- traverse (ExceptT . parseOne currentDir) $ xcModules config
 
-   return ()
+   forM_ _modules (liftIO . print)
+
+   -- return ()
 
 parseOne :: FilePath -> Module -> IO (Either XastError Program)
 parseOne currentDir module_ = runExceptT $ do

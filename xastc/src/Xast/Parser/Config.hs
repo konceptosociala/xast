@@ -4,15 +4,16 @@ module Xast.Parser.Config where
 
 import Data.Text (Text, split, unpack)
 import Xast.Parser.Headers (Module(..))
-import Xast.Parser (Parser, symbol, sc)
+import Xast.Parser (Parser)
 import Xast.Parser.Ident (Ident(..))
-import Text.Megaparsec.Char (string, newline)
+import Text.Megaparsec.Char (string, newline, space1)
 import Control.Monad (unless)
 import Text.Megaparsec
 import Xast.Parser.Expr (intLiteral, floatLiteral, stringLiteral)
 import Data.Functor (void)
 import Xast.Error (XastError (XastParseError))
 import Data.Bifunctor (Bifunctor(first))
+import qualified Text.Megaparsec.Char.Lexer as L
 
 data XastConfiguration = XastConfiguration
    { xcName :: Text
@@ -22,9 +23,21 @@ data XastConfiguration = XastConfiguration
    }
    deriving (Eq, Show)
 
+scToml :: Parser ()
+scToml = L.space
+   space1
+   (L.skipLineComment "#")
+   empty
+
+symbolToml :: Text -> Parser Text
+symbolToml = L.symbol scToml
+
+lexemeToml :: Parser a -> Parser a
+lexemeToml = L.lexeme scToml
+
 parseConfig :: String -> Text -> Either XastError XastConfiguration
 parseConfig filename code = first XastParseError $ 
-   runParser (sc *> xastConfig <* eof) filename code
+   runParser (scToml *> xastConfig <* eof) filename code
 
 data XastConfigField
    = XCFName Text
@@ -110,13 +123,13 @@ data TomlField
 
 tomlField :: Text -> Parser TomlField
 tomlField name = do
-   _ <- symbol name
-   _ <- symbol "="
+   _ <- symbolToml name
+   _ <- symbolToml "="
    choice
-      [ FInt   <$> intLiteral
-      , FFloat <$> floatLiteral
-      , FStr   <$> stringLiteral
-      , FArray <$> between (symbol "[") (symbol "]") (stringLiteral `sepEndBy` symbol ",")
+      [ FInt   <$> lexemeToml intLiteral
+      , FFloat <$> lexemeToml floatLiteral
+      , FStr   <$> lexemeToml stringLiteral
+      , FArray <$> between (symbolToml "[") (symbolToml "]") (lexemeToml stringLiteral `sepEndBy` symbolToml ",")
       , FBool  <$> do { b <- string "true" <|> string "false"; return $ b == "true"; }
       ]
 

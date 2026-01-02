@@ -3,7 +3,6 @@
 module Xast.Parser.Ident
    ( Ident(..)
    , typeIdent, fnIdent, genericIdent, varIdent, inferIdent
-   , operator, opToFnIdent
    , reserved, builtin
    ) where
 
@@ -35,55 +34,6 @@ builtin =
    , "opPow", "opEq", "opNeq", "opAnd", "opOr"
    , "opPipe", "opConcat"
    ]
-
-data Operator 
-   -- Math
-   = OpPlus    -- +
-   | OpMinus   -- -
-   | OpMul     -- *
-   | OpDiv     -- /
-   | OpMod     -- %
-   | OpPow     -- **
-   -- Logical
-   | OpEq      -- ==
-   | OpNeq     -- !=
-   | OpAnd     -- &&
-   | OpOr      -- ||
-   -- Other
-   | OpPipe    -- |>
-   | OpConcat  -- <>
-   deriving (Eq, Show)
-
-operator :: Parser Operator
-operator = choice
-   [ OpPlus    <$ symbol "+"
-   , OpMinus   <$ symbol "-"
-   , OpMul     <$ symbol "*"
-   , OpDiv     <$ symbol "/"
-   , OpMod     <$ symbol "%"
-   , OpPow     <$ symbol "**"
-   , OpEq      <$ symbol "=="
-   , OpNeq     <$ symbol "!="
-   , OpAnd     <$ symbol "&&"
-   , OpOr      <$ symbol "||"
-   , OpPipe    <$ symbol "|>"
-   , OpConcat  <$ symbol "<>"
-   ]
-
-opToFnIdent :: Operator -> Ident
-opToFnIdent op = case op of
-   OpPlus    -> Ident "opAdd"
-   OpMinus   -> Ident "opSub"
-   OpMul     -> Ident "opMul"
-   OpDiv     -> Ident "opDiv"
-   OpMod     -> Ident "opMod"
-   OpPow     -> Ident "opPow"
-   OpEq      -> Ident "opEq"
-   OpNeq     -> Ident "opNeq"
-   OpAnd     -> Ident "opAnd"
-   OpOr      -> Ident "opOr"
-   OpPipe    -> Ident "opPipe"
-   OpConcat  -> Ident "opConcat"
 
 genericIdent :: Parser Ident
 genericIdent = try $ lexeme $ do

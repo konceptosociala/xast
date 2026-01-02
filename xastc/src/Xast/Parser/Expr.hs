@@ -11,11 +11,12 @@ module Xast.Parser.Expr
    ) where
 
 import Data.Text (Text, pack)
-import Xast.Parser.Ident (Ident, varIdent, typeIdent, inferIdent)
-import Xast.Parser (Parser, lexeme, sc, symbol, Located(..), located)
+import Xast.Parser.Ident (Ident (Ident), varIdent, typeIdent, inferIdent)
+import Xast.Parser (Parser, lexeme, symbol, Located(..), located)
 import Text.Megaparsec (choice, manyTill, between, sepBy, MonadParsec (try), some, sepBy1, optional, getSourcePos, (<|>))
 import qualified Text.Megaparsec.Char.Lexer as L
 import Text.Megaparsec.Char (char)
+import Control.Monad.Combinators.Expr
 
 type ModBind = Maybe Ident
 
@@ -52,11 +53,115 @@ tupleOrParens = between (symbol "(") (symbol ")") $ do
       [Located _ t] -> pure t
       manyT -> pure (ExpTuple manyT)
 
-expr :: Parser (Located Expr)
-expr = do
+term :: Parser (Located Expr)
+term = do
    atoms <- some atomExpr
-   pos <- getSourcePos
-   return $ foldl1 (\l r -> Located pos (ExpApp l r)) atoms
+   pure $ foldl1 app atoms
+   where
+      app l@(Located pos _) r =
+         Located pos (ExpApp l r)
+
+data BuiltinOp 
+   -- Math
+   = OpPlus    -- +
+   | OpNeg     -- -
+   | OpMinus   -- -
+   | OpMul     -- *
+   | OpDiv     -- /
+   | OpMod     -- %
+   | OpPow     -- **
+   -- Logical
+   | OpEq      -- ==
+   | OpNeq     -- !=
+   | OpAnd     -- &&
+   | OpOr      -- ||   
+   | OpNot     -- !
+   | OpPipe    -- |>
+   | OpConcat  -- <>
+   deriving (Eq, Show)
+
+opIdent :: BuiltinOp -> Ident
+opIdent op = case op of
+   OpPlus    -> Ident "opAdd"
+   OpMinus   -> Ident "opSub"
+   OpMul     -> Ident "opMul"
+   OpDiv     -> Ident "opDiv"
+   OpMod     -> Ident "opMod"
+   OpPow     -> Ident "opPow"
+   OpEq      -> Ident "opEq"
+   OpNeq     -> Ident "opNeq"
+   OpAnd     -> Ident "opAnd"
+   OpOr      -> Ident "opOr"
+   OpNot     -> Ident "opNot"
+   OpPipe    -> Ident "opPipe"
+   OpConcat  -> Ident "opConcat"
+   OpNeg     -> Ident "opNeg"
+
+opVar :: BuiltinOp -> Expr
+opVar = ExpVar Nothing . opIdent
+
+opToken :: BuiltinOp -> Text
+opToken op = case op of
+   OpPlus    -> "+"
+   OpMinus   -> "-"
+   OpNeg     -> "-"
+   OpMul     -> "*"
+   OpDiv     -> "/"
+   OpMod     -> "%"
+   OpPow     -> "**"
+   OpEq      -> "=="
+   OpNeq     -> "!="
+   OpAnd     -> "&&"
+   OpOr      -> "||"
+   OpNot     -> "!"
+   OpPipe    -> "|>"
+   OpConcat  -> "<>"
+
+binOp :: BuiltinOp -> Located Expr -> Located Expr -> Located Expr
+binOp op a@(Located pos _) b = 
+   Located pos (ExpApp (Located pos (ExpApp (Located pos (opVar op)) a)) b)
+
+table :: [[Operator Parser (Located Expr)]]
+table =
+   [  [ Prefix (unary OpNot)
+      , Prefix (unary OpMinus)
+      ]
+
+   ,  [ InfixR (binary OpPow) ]
+
+   ,  [ InfixL (binary OpMul)
+      , InfixL (binary OpDiv)
+      , InfixL (binary OpMod)
+      ]
+
+   ,  [ InfixL (binary OpPlus)
+      , InfixL (binary OpMinus)
+      ]
+
+   ,  [ InfixN (binary OpEq)
+      , InfixN (binary OpNeq)
+      ]
+
+   ,  [ InfixR (binary OpAnd) ]
+   ,  [ InfixR (binary OpOr) ]
+
+   ,  [ InfixL (binary OpPipe) ]
+   ,  [ InfixL (binary OpConcat) ]
+   ]
+
+binary :: BuiltinOp -> Parser (Located Expr -> Located Expr -> Located Expr)
+binary op = do
+  _ <- symbol (opToken op)
+  pure (binOp op)
+
+unary :: BuiltinOp -> Parser (Located Expr -> Located Expr)
+unary op = do
+  _ <- symbol (opToken op)
+  pos <- getSourcePos
+  pure $ \x -> binOp op (Located pos (ExpLit (LitInt 0))) x
+
+expr :: Parser (Located Expr)
+expr = makeExprParser term table
 
 -- data Match = Match deriving (Eq, Show)
 
@@ -136,8 +241,8 @@ literal = choice
    [ tupleOrParensLit
    , LitString <$> stringLiteral
    , LitChar   <$> charLiteral
-   , LitFloat  <$> try signedFloat
-   , LitInt    <$> signedInt
+   , LitFloat  <$> try floatLiteral
+   , LitInt    <$> intLiteral
    , LitList   <$> between (symbol "[") (symbol "]") (literal `sepBy` symbol ",")
    ]
 
@@ -149,14 +254,8 @@ tupleOrParensLit = between (symbol "(") (symbol ")") $ do
       [t] -> pure t
       manyT -> pure (LitTuple manyT)
 
-signedFloat :: Parser Float
-signedFloat = L.signed sc floatLiteral
-
 floatLiteral :: Parser Float
 floatLiteral = lexeme L.float
-
-signedInt :: Parser Int
-signedInt = L.signed sc intLiteral
 
 intLiteral :: Parser Int
 intLiteral = lexeme L.decimal

@@ -23,7 +23,7 @@ system MultipleEntitiesWithSideEffectsEventsAndResources
     -> ((Enemy, Pos), List Effect)
         with
             event: (CustomEvent, OtherEvent),
-            resource: PhysicsHandler;
+            res: PhysicsHandler;
 
 system UpdatePlayerPosition #(p pos (Velocity velX velY)) = (pos, Event (p, pos));
 
@@ -34,13 +34,14 @@ fn myFunction a b =
    then Leaf b
    else Leaf 0;
 
-fn add() -> Int;
-fn add =
-    let a = 1 and
-    let b = 2 and 
-    let _ = [12, 4, 142] in
-
-        add a b;
+fn test() -> Int;
+fn test = 
+    if a != b then
+        12 + 14 * (28 + c)
+    else if !abcDef then
+        0 + 28 ** 2
+    else
+        42;
 
 fn apply1 = M.func a (a b);
 fn apply2 = (M.func a) b;
