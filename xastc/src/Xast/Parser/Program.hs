@@ -11,11 +11,12 @@ import Xast.Parser.Headers (ModuleDef, ImportDef, moduleDef, importDef)
 import Xast.Parser.Expr (stringLiteral)
 import Xast.Parser.System (System, system)
 import Xast.Parser.Extern
-import Text.Megaparsec.Error (ParseErrorBundle)
-import Data.Void (Void)
+import Xast.Error (XastError (XastParseError))
+import Data.Bifunctor (Bifunctor(first))
 
-parseProgram :: String -> Text -> Either (ParseErrorBundle Text Void) Program
-parseProgram = runParser (sc *> program <* eof)
+parseProgram :: String -> Text -> Either XastError Program
+parseProgram filename code = first XastParseError $ 
+   runParser (sc *> program <* eof) filename code
 
 data Program = Program 
    { progMode :: Mode

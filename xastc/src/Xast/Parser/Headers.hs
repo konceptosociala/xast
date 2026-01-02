@@ -5,11 +5,13 @@ module Xast.Parser.Headers
    ( ImportDef(..), importDef
    , ModuleDef(..), moduleDef
    , Module(..), module'
+   , moduleToPath
    ) where
 
-import Xast.Parser.Ident (Ident, typeIdent, fnIdent)
+import Xast.Parser.Ident (Ident (Ident), typeIdent, fnIdent)
 import Xast.Parser (Parser, symbol, Located, located)
 import Text.Megaparsec (sepBy1, between, (<|>), choice)
+import Data.Text (unpack)
 
 newtype Module = Module [Ident]
    deriving Eq
@@ -18,6 +20,9 @@ instance Show Module where
    show (Module []) = undefined
    show (Module [x]) = show x
    show (Module (x:xs)) = show x ++ "." ++ show (Module xs)
+
+moduleToPath :: Module -> String
+moduleToPath (Module ids) = "src/" ++ concatMap (\(Ident t) -> unpack t ++ "/") (init ids) ++ unpack (let Ident t = last ids in t) ++ ".xst"
 
 module' :: Parser Module
 module' = Module <$> typeIdent `sepBy1` "."

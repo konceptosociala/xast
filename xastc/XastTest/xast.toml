@@ -1,0 +1,10 @@
+[xast]
+name    = "XastTest"
+version = "0.1.0"
+author  = "Koncepto Sociala"
+modules = [
+    "Main",
+    "Utils.Components",
+    "Utils.Garbage",
+    "Utils.Renderer",
+]

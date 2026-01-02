@@ -18,6 +18,8 @@ library
     import:           warnings
     exposed-modules:  
         Xast,
+        Xast.Error,
+
         Xast.Parser,
         Xast.Parser.Ident,
         Xast.Parser.Type,
@@ -27,6 +29,7 @@ library
         Xast.Parser.Headers,
         Xast.Parser.Extern,
         Xast.Parser.Program,
+        Xast.Parser.Config,
 
         Xast.SemAnalyzer,
         Xast.SemAnalyzer.Env,

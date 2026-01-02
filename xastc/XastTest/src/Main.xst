@@ -9,13 +9,13 @@ system UpdatePlayerPosition #(Player, Pos, Velocity)
 system EnemyFollowPlayer
     #(Player, Pos)
     #(Enemy, Pos, Velocity)
-    -> (Enemy, Velocity)
+    -> (Enemy, Velocity);
 
 -- Return component is ambiguous
 system InvalidReturn
     #(Player, Pos)
     #(Enemy, Pos, Velocity)
-    -> Pos
+    -> Pos;
 
 system MultipleEntitiesWithSideEffectsEventsAndResources
     #(Player, Pos)
@@ -23,7 +23,7 @@ system MultipleEntitiesWithSideEffectsEventsAndResources
     -> ((Enemy, Pos), List Effect)
         with
             event: (CustomEvent, OtherEvent),
-            resource: PhysicsHandler
+            resource: PhysicsHandler;
 
 system UpdatePlayerPosition #(p pos (Velocity velX velY)) = (pos, Event (p, pos));
 

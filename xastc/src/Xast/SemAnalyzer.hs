@@ -11,12 +11,25 @@ import Xast.Parser.Function (FuncDef (..))
 import Xast.Parser.System (SystemDef)
 import Xast.Parser (Located)
 import Xast.Parser.Extern (ExternFunc, ExternType)
+import Text.Megaparsec (SourcePos)
+import Control.Monad.Writer (WriterT (runWriterT))
 
-type SemAnalyzer = ReaderT Env (StateT SymTable (Either SemError))
+data Warning = Warning
+   { warnContent :: String
+   , warnLoc :: SourcePos
+   }
 
-runSemAnalyzer :: Env -> SymTable -> SemAnalyzer a -> Either SemError (a, SymTable)
+type SemAnalyzer = 
+   WriterT [Warning]
+      ( ReaderT Env 
+         ( StateT SymTable 
+            (Either SemError)
+         )
+      )
+
+runSemAnalyzer :: Env -> SymTable -> SemAnalyzer a -> Either SemError ((a, [Warning]), SymTable)
 runSemAnalyzer env symTable analyzer =
-   runStateT (runReaderT analyzer env) symTable
+   runStateT (runReaderT (runWriterT analyzer) env) symTable
 
 data SemError
    = SEUndefinedVar Ident
@@ -87,4 +100,4 @@ data SystemSig = SystemSig
    }
 
 semFail :: SemError -> SemAnalyzer a
-semFail err = lift $ lift $ Left err
+semFail err = lift $ lift $ lift $ Left err

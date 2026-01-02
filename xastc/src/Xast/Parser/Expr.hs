@@ -6,6 +6,8 @@ module Xast.Parser.Expr
    , Literal(..), literal
    , LetIn(..), letIn
    , stringLiteral
+   , intLiteral
+   , floatLiteral
    ) where
 
 import Data.Text (Text, pack)

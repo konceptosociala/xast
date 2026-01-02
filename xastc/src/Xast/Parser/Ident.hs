@@ -4,7 +4,7 @@ module Xast.Parser.Ident
    ( Ident(..)
    , typeIdent, fnIdent, genericIdent, varIdent, inferIdent
    , operator, opToFnIdent
-   , reserved
+   , reserved, builtin
    ) where
 
 import Data.Text (Text, pack, unpack)
@@ -25,8 +25,13 @@ reserved =
    -- Keywords
    [ "type", "fn", "let", "in", "if", "then", "else"
    , "match", "of", "and", "system", "with", "extern"
+   , "event", "res"
+   ]
+
+builtin :: [Text]
+builtin = 
    -- Functions
-   , "opAdd", "opSub", "opMul", "opDiv", "opMod"
+   [ "opAdd", "opSub", "opMul", "opDiv", "opMod"
    , "opPow", "opEq", "opNeq", "opAnd", "opOr"
    , "opPipe", "opConcat"
    ]
