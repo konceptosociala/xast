@@ -1,7 +1,6 @@
 module Xast.SemAnalyzer where
 
 import Data.Map as M
-import Data.List (intercalate)
 import Control.Monad.Reader (ReaderT (runReaderT))
 import Control.Monad.State (StateT (runStateT))
 import Control.Monad.Trans (lift)
@@ -9,10 +8,11 @@ import Xast.Parser.Ident (Ident)
 import Xast.Parser.Type (Type, TypeDef)
 import Xast.Parser.Function (FuncDef (..))
 import Xast.Parser.System (SystemDef)
-import Xast.Parser (Located)
+import Xast.Parser (Located, Location)
 import Xast.Parser.Extern (ExternFunc, ExternType)
 import Text.Megaparsec (SourcePos)
 import Control.Monad.Writer (WriterT (runWriterT))
+import Xast.Parser.Headers (Module)
 
 data Warning = Warning
    { warnContent :: String
@@ -40,22 +40,7 @@ data SemError
    | SEExternTypeRedeclaration Ident
    | SESystemRedeclaration Ident
    | SEModuleRedeclaration [Ident]
-
-instance Show SemError where
-   show (SEUndefinedVar ident) =
-      "Undefined variable `" ++ show ident ++ "`"
-   show (SETypeRedeclaration ident) =
-      "Redeclaration of type `" ++ show ident ++ "`"
-   show (SEFnRedeclaration ident) =
-      "Redeclaration of function `" ++ show ident ++ "`"
-   show (SEExternFnRedeclaration ident) =
-      "Redeclaration of extern function `" ++ show ident ++ "`"
-   show (SEExternTypeRedeclaration ident) =
-      "Redeclaration of extern type `" ++ show ident ++ "`"
-   show (SESystemRedeclaration ident) =
-      "Redeclaration of system `" ++ show ident ++ "`"
-   show (SEModuleRedeclaration idents) =
-      "Redeclaration of module `" ++ intercalate "." (Prelude.map show idents) ++ "`"
+   | SESelfImportError Module Location Location
 
 data Env = Env
    { envVars :: M.Map Ident VarInfo
@@ -99,5 +84,5 @@ data SystemSig = SystemSig
    , sysWith :: [Type]
    }
 
-semFail :: SemError -> SemAnalyzer a
-semFail err = lift $ lift $ lift $ Left err
+failSem :: SemError -> SemAnalyzer a
+failSem err = lift $ lift $ lift $ Left err

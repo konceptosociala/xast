@@ -12,8 +12,8 @@ module Xast.Parser.Expr
 
 import Data.Text (Text, pack)
 import Xast.Parser.Ident (Ident (Ident), varIdent, typeIdent, inferIdent)
-import Xast.Parser (Parser, lexeme, symbol, Located(..), located)
-import Text.Megaparsec (choice, manyTill, between, sepBy, MonadParsec (try), some, sepBy1, optional, getSourcePos, (<|>))
+import Xast.Parser (Parser, lexeme, symbol, Located(..), located, Location (Location))
+import Text.Megaparsec (choice, manyTill, between, sepBy, MonadParsec (try), some, sepBy1, optional, getSourcePos, getOffset, (<|>))
 import qualified Text.Megaparsec.Char.Lexer as L
 import Text.Megaparsec.Char (char)
 import Control.Monad.Combinators.Expr
@@ -58,8 +58,8 @@ term = do
    atoms <- some atomExpr
    pure $ foldl1 app atoms
    where
-      app l@(Located pos _) r =
-         Located pos (ExpApp l r)
+      app l@(Located (Location posL offL _) _) r@(Located (Location _ offR lenR) _) =
+         Located (Location posL offL ((offR + lenR) - offL)) (ExpApp l r)
 
 data BuiltinOp 
    -- Math
@@ -118,8 +118,10 @@ opToken op = case op of
    OpConcat  -> "<>"
 
 binOp :: BuiltinOp -> Located Expr -> Located Expr -> Located Expr
-binOp op a@(Located pos _) b = 
-   Located pos (ExpApp (Located pos (ExpApp (Located pos (opVar op)) a)) b)
+binOp op a@(Located (Location posA offA _) _) b@(Located (Location _ offB lenB) _) = 
+   -- Span from start of a to end of b
+   let totalLen = (offB + lenB) - offA
+   in Located (Location posA offA totalLen) (ExpApp (Located (Location posA offA 0) (ExpApp (Located (Location posA offA 0) (opVar op)) a)) b)
 
 table :: [[Operator Parser (Located Expr)]]
 table =
@@ -158,7 +160,8 @@ unary :: BuiltinOp -> Parser (Located Expr -> Located Expr)
 unary op = do
   _ <- symbol (opToken op)
   pos <- getSourcePos
-  pure $ \x -> binOp op (Located pos (ExpLit (LitInt 0))) x
+  off <- getOffset
+  pure $ \x -> binOp op (Located (Location pos off 0) (ExpLit (LitInt 0))) x
 
 expr :: Parser (Located Expr)
 expr = makeExprParser term table

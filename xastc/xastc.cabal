@@ -1,15 +1,12 @@
 cabal-version:      3.0
 name:               xastc
 version:            0.1.0.0
--- synopsis:
 description:        Xast language compiler
 license:            Unlicense
 license-file:       LICENSE
 author:             Oleksandr Hnutov
 maintainer:         sanerhp.mail@gmail.com
--- copyright:
 build-type:         Simple
--- extra-source-files:
 
 common warnings
     ghc-options: -Wall
@@ -19,6 +16,7 @@ library
     exposed-modules:  
         Xast,
         Xast.Error,
+        Xast.Utils,
 
         Xast.Parser,
         Xast.Parser.Ident,
@@ -35,8 +33,7 @@ library
         Xast.SemAnalyzer.Env,
         Xast.SemAnalyzer.SymTable,
         Xast.SemAnalyzer.Analysis
-    -- other-modules:
-    -- other-extensions:
+
     build-depends:    
         mtl ^>=2.3.1,
         base ^>=4.18.3.0,
@@ -45,15 +42,14 @@ library
         containers ==0.6.7,
         vector ==0.13.2.0,
         directory ==1.3.9.0,
-        parser-combinators ==1.3.0
+        parser-combinators ==1.3.0,
+        diagnose
     hs-source-dirs:   src
     default-language: GHC2021
 
 executable xastc
     import:           warnings
     main-is:          Main.hs
-    -- other-modules:
-    -- other-extensions:
     build-depends:
         base ^>=4.18.3.0,
         text ==2.0.2,
@@ -65,8 +61,6 @@ executable xastc
 test-suite xastc-test
     import:           warnings
     default-language: GHC2021
-    -- other-modules:
-    -- other-extensions:
     type:             exitcode-stdio-1.0
     hs-source-dirs:   test
     main-is:          Main.hs

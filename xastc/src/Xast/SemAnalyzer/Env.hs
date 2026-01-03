@@ -10,4 +10,4 @@ lookupVar x = do
    env <- ask
    case M.lookup x (envVars env) of 
       Just val -> return val
-      Nothing  -> semFail (SEUndefinedVar x)
+      Nothing  -> failSem (SEUndefinedVar x)

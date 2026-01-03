@@ -1,6 +1,7 @@
 module Main exports { UpdatePlayerPosition }
 
 use Components *
+use Main *
 
 system UpdatePlayerPosition #(Player, Pos, Velocity) 
     -> (Pos, List Effect);

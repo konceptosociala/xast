@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Xast.Parser
-   ( Parser, Located(..)
+   ( Parser, Located(..), Location(..)
    , located
    , sc
    , lexeme
@@ -10,7 +10,7 @@ module Xast.Parser
    , (<->)
    ) where
 
-import Text.Megaparsec (Parsec, empty, MonadParsec (observing, try), parseError, SourcePos, getSourcePos)
+import Text.Megaparsec (Parsec, empty, MonadParsec (observing, try), parseError, SourcePos, getSourcePos, getOffset)
 import Data.Void (Void)
 import Data.Text (Text)
 import qualified Text.Megaparsec.Char.Lexer as L
@@ -18,15 +18,25 @@ import Text.Megaparsec.Char (space1)
 import Control.Monad (void)
 
 data Located a = Located
-   { lLocation :: SourcePos
-   , lNode :: a
+   { lLocation :: Location
+   , lNode     :: a
+   }
+   deriving (Eq, Show)
+
+data Location = Location 
+   { lPos :: SourcePos
+   , lOffset   :: Int
+   , lLength   :: Int
    }
    deriving (Eq, Show)
 
 located :: Parser a -> Parser (Located a)
 located p = do
+  offset1 <- getOffset
   pos <- getSourcePos
-  Located pos <$> p
+  node <- p
+  offset2 <- getOffset
+  pure $ Located (Location pos offset1 (offset2 - offset1)) node
 
 type Parser = Parsec Void Text
 

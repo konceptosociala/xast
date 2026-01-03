@@ -1,0 +1,6 @@
+packages:
+  .
+  ./diagnose
+
+with-compiler: ghc-9.6.7
+optimization: 0
