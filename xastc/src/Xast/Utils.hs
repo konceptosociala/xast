@@ -1,4 +1,3 @@
-{-# LANGUAGE UndecidableInstances #-}
 module Xast.Utils where
 
 data Colored = Colored

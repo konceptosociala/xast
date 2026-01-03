@@ -4,3 +4,6 @@ packages:
 
 with-compiler: ghc-9.6.7
 optimization: 0
+
+package diagnose
+  flags: +megaparsec-compat

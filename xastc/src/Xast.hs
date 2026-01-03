@@ -5,7 +5,7 @@ module Xast (runCompile) where
 import Data.Text (pack)
 import Data.List (dropWhileEnd)
 import System.Directory (getCurrentDirectory, doesFileExist)
-import Control.Monad (unless)
+import Control.Monad (unless, filterM)
 import Xast.Parser.Config (parseConfig, XastConfiguration (xcModules))
 import Control.Monad.Except
 import Control.Monad.IO.Class (MonadIO(liftIO))
@@ -15,12 +15,12 @@ import Xast.Parser.Headers (Module, moduleToPath)
 import Xast.SemAnalyzer (runSemAnalyzer, emptyEnv, emptySymTable)
 import Xast.SemAnalyzer.Analysis (fullAnalysis)
 import Data.Bifunctor (Bifunctor(first))
-import Xast.Utils (green, bold)
+import Xast.Utils (green, bold, cyan)
 
 runCompile :: Maybe FilePath -> IO ()
 runCompile dir = runCompile_ dir >>= \case
    Left err -> printError err
-   Right () -> putStrLn "Compilation completed"
+   Right () -> print $ green $ bold ("Compilation completed" :: String)
 
 runCompile_ :: Maybe FilePath -> IO (Either XastError ())
 runCompile_ dir = runExceptT $ do
@@ -35,6 +35,13 @@ runCompile_ dir = runExceptT $ do
 
    configContent <- pack <$> liftIO (readFile configFile)
    config <- ExceptT $ pure $ parseConfig configFile configContent
+   invalidModules <- liftIO $ filterM 
+      (\m -> not <$> doesFileExist (currentDir ++ "/" ++ moduleToPath m)) 
+      (xcModules config)
+
+   case invalidModules of
+      (m:_) -> throwError (XastModuleNotFound m currentDir)
+      []    -> return ()
 
    -- Parse modules
    programs <- traverse (ExceptT . parseOne currentDir) $ xcModules config
@@ -46,14 +53,8 @@ runCompile_ dir = runExceptT $ do
 
 parseOne :: FilePath -> Module -> IO (Either XastError Program)
 parseOne currentDir module_ = runExceptT $ do
-   liftIO $ print $ green ("Parsing module: " ++ show (bold (show module_)))
+   liftIO $ print $ green $ bold ("Parsing module: " ++ show (cyan (bold (show module_))))
 
-   -- Check if module exists
    let filepath = currentDir ++ "/" ++ moduleToPath module_
-   exists <- liftIO $ doesFileExist filepath
-   unless exists $ do
-      throwError (XastModuleNotFound module_ currentDir)
-
-   -- Parse module code
    code <- liftIO $ readFile filepath
    ExceptT $ pure $ parseProgram filepath (pack code)

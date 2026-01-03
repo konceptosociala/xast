@@ -10,14 +10,17 @@ import Xast.Parser.Function (FuncDef (..))
 import Xast.Parser.System (SystemDef)
 import Xast.Parser (Located, Location)
 import Xast.Parser.Extern (ExternFunc, ExternType)
-import Text.Megaparsec (SourcePos)
-import Control.Monad.Writer (WriterT (runWriterT))
+import Control.Monad.Writer (WriterT (runWriterT), MonadWriter (tell))
 import Xast.Parser.Headers (Module)
 
 data Warning = Warning
-   { warnContent :: String
-   , warnLoc :: SourcePos
+   { warnType :: WarningType
+   , warnLoc :: Location
    }
+
+data WarningType
+   = WUnusedImport Module
+   | WDeadCode Ident
 
 type SemAnalyzer = 
    WriterT [Warning]
@@ -86,3 +89,6 @@ data SystemSig = SystemSig
 
 failSem :: SemError -> SemAnalyzer a
 failSem err = lift $ lift $ lift $ Left err
+
+warnSem :: WarningType -> Location -> SemAnalyzer ()
+warnSem ty loc = tell [Warning ty loc]

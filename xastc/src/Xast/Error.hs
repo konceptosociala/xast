@@ -1,13 +1,20 @@
+{-# OPTIONS_GHC -Wno-orphans #-}
 module Xast.Error where
 
 import Text.Megaparsec
 import Data.Text (Text)
+import qualified Data.Text as Text
 import Data.Void (Void)
 import Xast.SemAnalyzer (SemError (SESelfImportError))
-import Xast.Parser.Headers (Module)
+import Xast.Parser.Headers (Module, moduleToPath)
 import Error.Diagnose
+import Error.Diagnose.Compat.Megaparsec (errorDiagnosticFromBundle, HasHints(..))
 import Xast.Utils (bold, red)
 import Xast.Parser (Location (Location))
+
+instance HasHints Void String where
+   hints :: Void -> [Note String]
+   hints _ = []
 
 -- instance Show SemError where
 --    show (SEUndefinedVar ident) =
@@ -33,6 +40,31 @@ data XastError
 
 class PrintError a where
    printError :: a -> IO ()
+
+instance PrintError XastError where
+   printError :: XastError -> IO ()
+   printError (XastSemAnalyzeError e) = printError e
+   printError (XastParseError bundle) = printError bundle
+   printError (XastFileNotFound file dir) = do
+      let msg = "File `" <> file <> "` not found in directory: " <> dir
+      let report = Err Nothing msg [] []
+      let diagnostic = addReport mempty report
+      printDiagnostic stdout WithUnicode (TabSize 4) defaultStyle diagnostic
+
+   printError (XastModuleNotFound module_ dir) = do
+      let msg = "Module `" <> show module_ <> "` not found at path: " <> dir <> "/" <> moduleToPath module_
+      let report = Err Nothing msg [] []
+      let diagnostic = addReport mempty report
+      printDiagnostic stdout WithUnicode (TabSize 4) defaultStyle diagnostic
+
+instance PrintError (ParseErrorBundle Text Void) where
+   printError :: ParseErrorBundle Text Void -> IO ()
+   printError bundle = do
+      let diagnostic = errorDiagnosticFromBundle Nothing "Parsing error" Nothing bundle
+          filename = sourceName . pstateSourcePos . bundlePosState $ bundle
+          sourceText = Text.unpack . pstateInput . bundlePosState $ bundle
+          diagnosticWithFile = addFile diagnostic filename sourceText
+      printDiagnostic stdout WithUnicode (TabSize 4) defaultStyle diagnosticWithFile
 
 instance PrintError SemError where
    printError :: SemError -> IO ()
@@ -63,36 +95,3 @@ instance PrintError SemError where
       printDiagnostic stdout WithUnicode (TabSize 4) defaultStyle $ addReport diagnostic report
 
    printError _ = undefined
-
-instance PrintError XastError where
-   printError :: XastError -> IO ()
-   printError (XastSemAnalyzeError e) = printError e
-   printError _ = undefined
-
--- printTest :: IO ()
--- printTest = do
---    let beautifulExample =
---          Err
---          Nothing
---          "Could not deduce constraint 'Num(a)' from the current context"
---          [ (Position (1, 25) (2, 6) "somefile.zc", This "While applying function '+'")
---          , (Position (1, 11) (1, 16) "somefile.zc", Where "'x' is supposed to have type 'a'")
---          , (Position (1, 8) (1, 9) "somefile.zc", Where "type 'a' is bound here without constraints")
---          ]
---          [Note "Adding 'Num(a)' to the list of constraints may solve this problem."]
-
---    let diagnostic  = addFile mempty "somefile.zc" "let id<a>(x : a) : a := x\n  + 1"
---    let diagnostic' = addReport diagnostic beautifulExample
-
---    printDiagnostic stdout WithUnicode (TabSize 4) defaultStyle diagnostic'
-
--- instance Show XastError where
---    show :: XastError -> String
---    show (XastParseError bundle) = 
---       "Parsing error: " <> errorBundlePretty bundle
---    show (XastSemAnalyzeError sem) = 
---       "Semantic error: "
---    show (XastFileNotFound file dir) = 
---       "File `" <> file <> "` not found in directory: " <> dir 
---    show (XastModuleNotFound module_ dir) = 
---       "Module `" <> show module_ <> "` not found at path: " <> dir <> "/" <> moduleToPath module_
