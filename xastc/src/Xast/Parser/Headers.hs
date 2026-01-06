@@ -14,7 +14,7 @@ import Text.Megaparsec (sepBy1, between, (<|>), choice)
 import Data.Text (unpack)
 
 newtype Module = Module [Ident]
-   deriving Eq
+   deriving (Eq, Ord)
 
 instance Show Module where
    show (Module []) = undefined

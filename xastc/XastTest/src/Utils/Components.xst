@@ -1,5 +1,7 @@
 module Utils.Components exports { Pos, Velocity, Player }
 
+use Main *
+
 type Pos = Pos {
    x : Int,
    y : Int

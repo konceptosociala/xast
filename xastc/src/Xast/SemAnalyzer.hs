@@ -1,49 +1,43 @@
 module Xast.SemAnalyzer where
 
-import Data.Map as M
+import qualified Data.Map as M
 import Control.Monad.Reader (ReaderT (runReaderT))
 import Control.Monad.State (StateT (runStateT))
-import Control.Monad.Trans (lift)
 import Xast.Parser.Ident (Ident)
 import Xast.Parser.Type (Type, TypeDef)
 import Xast.Parser.Function (FuncDef (..))
 import Xast.Parser.System (SystemDef)
-import Xast.Parser (Located, Location)
+import Xast.Parser (Located)
 import Xast.Parser.Extern (ExternFunc, ExternType)
 import Control.Monad.Writer (WriterT (runWriterT), MonadWriter (tell))
-import Xast.Parser.Headers (Module)
-
-data Warning = Warning
-   { warnType :: WarningType
-   , warnLoc :: Location
-   }
-
-data WarningType
-   = WUnusedImport Module
-   | WDeadCode Ident
+import Control.Monad.Identity (Identity (runIdentity))
+import Xast.Error
 
 type SemAnalyzer = 
-   WriterT [Warning]
+   WriterT [SemInfo]
       ( ReaderT Env 
-         ( StateT SymTable 
-            (Either SemError)
+         ( StateT 
+            SymTable 
+            Identity
          )
       )
 
-runSemAnalyzer :: Env -> SymTable -> SemAnalyzer a -> Either SemError ((a, [Warning]), SymTable)
+runSemAnalyzer :: Env -> SymTable -> SemAnalyzer a -> Identity ((a, [SemInfo]), SymTable)
 runSemAnalyzer env symTable analyzer =
    runStateT (runReaderT (runWriterT analyzer) env) symTable
 
-data SemError
-   = SEUndefinedVar Ident
-   -- | SETypeMismatch Ident
-   | SETypeRedeclaration Ident
-   | SEFnRedeclaration Ident
-   | SEExternFnRedeclaration Ident
-   | SEExternTypeRedeclaration Ident
-   | SESystemRedeclaration Ident
-   | SEModuleRedeclaration [Ident]
-   | SESelfImportError Module Location Location
+runPhase
+   :: Env
+   -> SymTable
+   -> SemAnalyzer ()
+   -> Either [SemError] (SymTable, [SemWarning])
+runPhase env st phase =
+   let (((), infos), st') = runIdentity (runSemAnalyzer env st phase)
+       errors = [ e | SemError e <- infos ]
+       warnings = [ w | SemWarning w <- infos ]
+   in if null errors
+      then Right (st', warnings)
+      else Left errors
 
 data Env = Env
    { envVars :: M.Map Ident VarInfo
@@ -87,8 +81,8 @@ data SystemSig = SystemSig
    , sysWith :: [Type]
    }
 
-failSem :: SemError -> SemAnalyzer a
-failSem err = lift $ lift $ lift $ Left err
+errSem :: SemError -> SemAnalyzer ()
+errSem err = tell [SemError err]
 
-warnSem :: WarningType -> Location -> SemAnalyzer ()
-warnSem ty loc = tell [Warning ty loc]
+warnSem :: SemWarning -> SemAnalyzer ()
+warnSem warn = tell [SemWarning warn]

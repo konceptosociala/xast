@@ -28,7 +28,7 @@ data Location = Location
    , lOffset   :: Int
    , lLength   :: Int
    }
-   deriving (Eq, Show)
+   deriving (Eq, Show, Ord)
 
 located :: Parser a -> Parser (Located a)
 located p = do

@@ -5,12 +5,14 @@ import Text.Megaparsec
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Void (Void)
-import Xast.SemAnalyzer (SemError (SESelfImportError))
 import Xast.Parser.Headers (Module, moduleToPath)
 import Error.Diagnose
 import Error.Diagnose.Compat.Megaparsec (errorDiagnosticFromBundle, HasHints(..))
 import Xast.Utils (bold, red)
 import Xast.Parser (Location (Location))
+import Xast.Parser.Ident (Ident)
+import Control.Monad (forM_)
+import Data.List (intercalate)
 
 instance HasHints Void String where
    hints :: Void -> [Note String]
@@ -32,11 +34,43 @@ instance HasHints Void String where
 --    show (SEModuleRedeclaration idents) =
 --       "Redeclaration of module `" ++ intercalate "." (Prelude.map show idents) ++ "`"
 
+data SemInfo
+   = SemWarning SemWarning
+   | SemError SemError
+
+data SemError
+   = SEUndefinedVar Ident
+   -- | SETypeMismatch Ident
+   | SETypeRedeclaration Ident
+   | SEFnRedeclaration Ident
+   | SEExternFnRedeclaration Ident
+   | SEExternTypeRedeclaration Ident
+   | SESystemRedeclaration Ident
+   | SEModuleRedeclaration [Ident]
+   | SESelfImportError Module Location Location
+   | SECyclicImportError [Module] Location
+   deriving Show
+
+data SemWarning = Warning
+   { swType :: SemWarningType
+   , swLoc :: Location
+   }
+   deriving Show
+
+data SemWarningType
+   = SWUnusedImport Module
+   | SWDeadCode Ident
+   deriving Show
+
 data XastError
    = XastParseError (ParseErrorBundle Text Void)
    | XastSemAnalyzeError SemError
    | XastFileNotFound FilePath FilePath
    | XastModuleNotFound Module FilePath
+   deriving Show
+
+printWarnings :: [SemWarning] -> IO ()
+printWarnings warns = forM_ warns print
 
 class PrintError a where
    printError :: a -> IO ()
@@ -72,26 +106,45 @@ instance PrintError SemError where
       let Location fromPos _ fromLen = from
           Location toPos _ toLen = to
           filename = sourceName fromPos
-      
-      file <- readFile filename
 
-      let toPosition (SourcePos _ line col) len =
-            let startLine = unPos line
-                startCol = unPos col
-                endLine = startLine
-                endCol = startCol + len
-            in Position (startLine, startCol) (endLine, endCol) filename
+      file <- readFile filename
 
       let report =
             Err
             Nothing
             ("Found self-referencing import in module: " <> show (red (bold (show module_))))
-            [ (toPosition fromPos fromLen, Where "Module is defined here")
-            , (toPosition toPos toLen, This "Module imports itself here")
+            [ (toPosition fromPos fromLen filename, Where "Module is defined here")
+            , (toPosition toPos toLen filename, This "Module imports itself here")
             ]
             [Note "A module cannot import itself. Remove this import statement."]
 
       let diagnostic  = addFile mempty filename file
       printDiagnostic stdout WithUnicode (TabSize 4) defaultStyle $ addReport diagnostic report
 
+   printError (SECyclicImportError modules loc) = do
+      let Location pos _ len = loc
+      let filename = sourceName pos
+      let cycleT = intercalate " ─▶ " (map show modules)
+      
+      file <- readFile filename
+
+      let report =
+            Err
+            Nothing
+            ("Found cyclical import: " <> show (red (bold cycleT)))
+            [ (toPosition pos len filename, Where "Module is defined here")
+            ]
+            []
+
+      let diagnostic  = addFile mempty filename file
+      printDiagnostic stdout WithUnicode (TabSize 4) defaultStyle $ addReport diagnostic report
+
    printError _ = undefined
+
+toPosition :: SourcePos -> Int -> FilePath -> Position
+toPosition (SourcePos _ line col) len filename =
+   let startLine = unPos line
+       startCol = unPos col
+       endLine = startLine
+       endCol = startCol + len
+   in Position (startLine, startCol) (endLine, endCol) filename
