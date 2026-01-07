@@ -21,7 +21,7 @@ data Located a = Located
    { lLocation :: Location
    , lNode     :: a
    }
-   deriving (Eq, Show)
+   deriving (Eq, Show, Ord)
 
 data Location = Location 
    { lPos :: SourcePos

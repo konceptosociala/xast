@@ -57,7 +57,7 @@ data ImportDef = ImportDef
    { imdMod :: Module
    , imdPayload :: ImportPayload
    }
-   deriving (Eq, Show)
+   deriving (Eq, Show, Ord)
 
 importDef :: Parser (Located ImportDef)
 importDef = located $ do
@@ -71,7 +71,7 @@ data ImportPayload
    = ImpAlias Ident
    | ImpSelect [Ident]
    | ImpFull
-   deriving (Eq, Show)
+   deriving (Eq, Show, Ord)
 
 importPayload :: Parser ImportPayload
 importPayload = choice

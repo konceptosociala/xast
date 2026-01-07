@@ -1,5 +1,25 @@
 module Xast.Utils where
 
+import qualified Data.Set as S
+
+allEqual :: Ord a => [a] -> Bool
+allEqual xs =
+   all
+      (uncurry (==))
+      (S.cartesianProduct
+         (S.fromList xs)
+         (S.fromList xs)
+      )
+
+anyEqual :: Ord a => [a] -> Bool
+anyEqual xs =
+   any
+      (uncurry (==))
+      (S.cartesianProduct
+         (S.fromList xs)
+         (S.fromList xs)
+      )
+
 data Colored = Colored
    { clrText :: String
    , clrColor :: Color

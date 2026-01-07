@@ -4,8 +4,6 @@ use My.Module1 as M
 use My.Module2 {imp1, Imp2}
 use My.Module3 *
 
-use Utils.Garbage as Same
-
 type Tree a 
    = Node {
       left : Maybe (Tree a),

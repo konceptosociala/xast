@@ -1,10 +1,9 @@
 module Xast.SemAnalyzer.Analysis where
 
 import qualified Data.Map as M
-import Control.Monad.State (MonadState(..))
-import Control.Monad (when, forM_, unless)
-import Xast.SemAnalyzer (SemAnalyzer, SymTable (..), errSem, emptyEnv, emptySymTable, runPhase)
-import Xast.Parser.Ident (Ident)
+import Control.Monad.State (MonadState(..), MonadIO (liftIO))
+import Control.Monad (forM_, unless)
+import Xast.SemAnalyzer (SemAnalyzer, SymTable (..), errSem, emptyEnv, emptySymTable, runPhase, QualifiedName (QualifiedName), warnSem)
 import Xast.Parser (Located (..), Location)
 import Xast.Parser.Function (FuncDef (..), Func (..))
 import Xast.Parser.Type (TypeDef (..))
@@ -12,12 +11,24 @@ import Xast.Parser.Extern (ExternFunc(..), ExternType(..), Extern (..))
 import Xast.Parser.System (SystemDef(..), System (SysDef))
 import Xast.Parser.Program (Program(..), Stmt (..))
 import Xast.Parser.Headers (ModuleDef(ModuleDef), ImportDef (ImportDef), Module)
-import Xast.Error (SemError(..))
+import Xast.Error (SemError(..), printWarnings, SemWarning (SWDuplicateImport))
 import Control.Monad.Except (runExceptT, ExceptT(..))
 import qualified Data.Set as S
+import Xast.Utils (allEqual)
+import Data.Function ((&))
 
 -- checkTypes :: Program -> SemAnalyzer ()
 -- checkTypes 
+
+resolveDuplicateImports :: Program -> SemAnalyzer ()
+resolveDuplicateImports (Program _ _ imports _) =
+   forM_ imports $ \this ->
+      let others = imports
+            & filter (== this)
+            & map lLocation
+
+      in unless (null others) $ 
+         warnSem (SWDuplicateImport (lLocation this) others)
 
 resolveCyclicImports :: [Program] -> SemAnalyzer ()
 resolveCyclicImports progs = do
@@ -26,11 +37,11 @@ resolveCyclicImports progs = do
 
    forM_ (M.keys moduleMap) $ \moduleName ->
       forM_ (M.lookup moduleName moduleLocations)
-         ( detectCycle 
-            moduleMap 
-            moduleLocations 
-            S.empty 
-            [moduleName] 
+         ( detectCycle
+            moduleMap
+            moduleLocations
+            S.empty
+            [moduleName]
             moduleName
          )
 
@@ -52,7 +63,7 @@ detectCycle moduleMap moduleLocations visited path current loc
    | current `S.member` visited =
       case dropWhile (/= current) path of
          [] -> return ()
-         cyc -> unless (selfImportCycle cyc) $ 
+         cyc -> unless (allEqual cyc) $
             errSem (SECyclicImportError cyc loc)
    | otherwise =
       case M.lookup current moduleMap of
@@ -60,21 +71,12 @@ detectCycle moduleMap moduleLocations visited path current loc
          Just imports ->
             forM_ imports $ \imp ->
                forM_ (M.lookup imp moduleLocations)
-                  ( detectCycle 
-                     moduleMap 
-                     moduleLocations 
-                     (S.insert current visited) 
+                  ( detectCycle
+                     moduleMap
+                     moduleLocations
+                     (S.insert current visited)
                      (path ++ [imp]) imp
                   )
-
-selfImportCycle :: [Module] -> Bool
-selfImportCycle ms = 
-   all 
-      (uncurry (==)) 
-      (S.cartesianProduct 
-         (S.fromList ms)
-         (S.fromList ms)
-      )
 
 resolveSelfImport :: Program -> SemAnalyzer ()
 resolveSelfImport (Program _ (Located from (ModuleDef this _)) imports _) =
@@ -86,74 +88,95 @@ importAnalysis :: [Program] -> SemAnalyzer ()
 importAnalysis progs = do
    forM_ progs resolveSelfImport
    resolveCyclicImports progs
+   forM_ progs resolveDuplicateImports
 
 fullAnalysis :: [Program] -> IO (Either [SemError] ())
 fullAnalysis progs = runExceptT $ do
    let env = emptyEnv
        st0 = emptySymTable
 
-   (_st1, _warns1) <- ExceptT $ pure $ runPhase env st0 (importAnalysis progs)
+   (st1, warns1) <- ExceptT $ pure $ runPhase env st0 (forM_ progs declareStmts)
+   liftIO $ printWarnings warns1
+
+   (_, warns2) <- ExceptT $ pure $ runPhase env st1 (importAnalysis progs)
+   liftIO $ printWarnings warns2
 
    return ()
 
 declareStmts :: Program -> SemAnalyzer ()
-declareStmts (Program _ _ _ stmts) = mapM_ declareStmt stmts
+declareStmts (Program _ (Located _ (ModuleDef module_ _)) _ stmts) = 
+   forM_ stmts (declareStmt module_)
 
-declareStmt :: Stmt -> SemAnalyzer ()
-declareStmt stmt = case stmt of
+declareStmt :: Module -> Stmt -> SemAnalyzer ()
+declareStmt module_ stmt = case stmt of
    StmtFunc (FnDef fd@(Located _ (FuncDef ident _ _))) ->
-      declareFn ident fd
+      declareFn (QualifiedName module_ ident) fd
 
    StmtTypeDef td@(Located _ (TypeDef ident _ _)) ->
-      declareType ident td
+      declareType (QualifiedName module_ ident) td
 
    StmtExtern (ExtFunc ef@(Located _ (ExternFunc ident _ _))) ->
-      declareExternFn ident ef
+      declareExternFn (QualifiedName module_ ident) ef
 
    StmtExtern (ExtType et@(Located _ (ExternType ident _))) ->
-      declareExternType ident et
+      declareExternType (QualifiedName module_ ident) et
 
    StmtSystem (SysDef sd@(Located _(SystemDef _ ident _ _ _))) ->
-      declareSystem ident sd
+      declareSystem (QualifiedName module_ ident) sd
 
    _ -> return ()
 
-declareFn :: Ident -> Located FuncDef -> SemAnalyzer ()
-declareFn ident fd = do
+declareFn :: QualifiedName -> Located FuncDef -> SemAnalyzer ()
+declareFn name@(QualifiedName _ ident) fd@(Located newLoc _) = do
    st <- get
-   when (M.member ident (symFns st)) $
-      errSem (SEFnRedeclaration ident)
 
-   put st { symFns = M.insert ident fd (symFns st) }
+   case M.lookup name (symFns st) of
+      Just (Located oldLoc _) -> 
+         errSem (SEFnRedeclaration ident oldLoc newLoc)
 
-declareType :: Ident -> Located TypeDef -> SemAnalyzer ()
-declareType ident td = do
+      Nothing -> 
+         put st { symFns = M.insert name fd (symFns st) }
+
+declareType :: QualifiedName -> Located TypeDef -> SemAnalyzer ()
+declareType name@(QualifiedName _ ident) td@(Located newLoc _) = do
    st <- get
-   when (M.member ident (symTypes st)) $
-      errSem (SETypeRedeclaration ident)
 
-   put st { symTypes = M.insert ident td (symTypes st) }
+   case M.lookup name (symTypes st) of
+      Just (Located oldLoc _) ->
+         errSem (SETypeRedeclaration ident oldLoc newLoc)
 
-declareExternFn :: Ident -> Located ExternFunc -> SemAnalyzer ()
-declareExternFn ident ef = do
+      Nothing ->
+         put st { symTypes = M.insert name td (symTypes st) }
+
+declareExternFn :: QualifiedName -> Located ExternFunc -> SemAnalyzer ()
+declareExternFn name@(QualifiedName _ ident) ef@(Located newLoc _) = do
    st <- get
-   when (M.member ident (symFns st)) $
-      errSem (SEExternFnRedeclaration ident)
 
-   put st { symExternFns = M.insert ident ef (symExternFns st) }
+   case M.lookup name (symExternFns st) of
+      Just (Located oldLoc _) ->
+         errSem (SEExternFnRedeclaration ident oldLoc newLoc)
 
-declareExternType :: Ident -> Located ExternType -> SemAnalyzer ()
-declareExternType ident et = do
+      Nothing ->
+         put st { symExternFns = M.insert name ef (symExternFns st) }
+
+declareExternType :: QualifiedName -> Located ExternType -> SemAnalyzer ()
+declareExternType name@(QualifiedName _ ident) et@(Located newLoc _) = do
    st <- get
-   when (M.member ident (symExternTypes st)) $
-      errSem (SEExternTypeRedeclaration ident)
 
-   put st { symExternTypes = M.insert ident et (symExternTypes st) }
+   case M.lookup name (symExternTypes st) of
+      Just (Located oldLoc _) ->
+         errSem (SEExternTypeRedeclaration ident oldLoc newLoc)
 
-declareSystem :: Ident -> Located SystemDef -> SemAnalyzer ()
-declareSystem ident sd = do
+      Nothing ->
+         put st { symExternTypes = M.insert name et (symExternTypes st) }
+
+declareSystem :: QualifiedName -> Located SystemDef -> SemAnalyzer ()
+declareSystem name@(QualifiedName _ ident) sd@(Located newLoc _) = do
    st <- get
-   when (M.member ident (symSystems st)) $
-      errSem (SESystemRedeclaration ident)
 
-   put st { symSystems = M.insert ident sd (symSystems st) }
+   case M.lookup name (symSystems st) of
+      Just (Located oldLoc _) ->
+         errSem (SESystemRedeclaration ident oldLoc newLoc)
+
+      Nothing ->
+         put st { symSystems = M.insert name sd (symSystems st) }

@@ -39,27 +39,22 @@ data SemInfo
    | SemError SemError
 
 data SemError
-   = SEUndefinedVar Ident
-   -- | SETypeMismatch Ident
-   | SETypeRedeclaration Ident
-   | SEFnRedeclaration Ident
-   | SEExternFnRedeclaration Ident
-   | SEExternTypeRedeclaration Ident
-   | SESystemRedeclaration Ident
-   | SEModuleRedeclaration [Ident]
-   | SESelfImportError Module Location Location
+   = SESelfImportError Module Location Location
    | SECyclicImportError [Module] Location
+   | SETypeRedeclaration Ident Location Location
+   | SEFnRedeclaration Ident Location Location
+   | SEExternFnRedeclaration Ident Location Location
+   | SEExternTypeRedeclaration Ident Location Location
+   | SESystemRedeclaration Ident Location Location
+
+   | SEModuleRedeclaration [Ident]
+   | SEUndefinedVar Ident
    deriving Show
 
-data SemWarning = Warning
-   { swType :: SemWarningType
-   , swLoc :: Location
-   }
-   deriving Show
-
-data SemWarningType
+data SemWarning
    = SWUnusedImport Module
    | SWDeadCode Ident
+   | SWDuplicateImport Location [Location]
    deriving Show
 
 data XastError
@@ -139,7 +134,7 @@ instance PrintError SemError where
       let diagnostic  = addFile mempty filename file
       printDiagnostic stdout WithUnicode (TabSize 4) defaultStyle $ addReport diagnostic report
 
-   printError _ = undefined
+   printError unimplemented = error $ "Unimplemented SA Error: " ++ show unimplemented
 
 toPosition :: SourcePos -> Int -> FilePath -> Position
 toPosition (SourcePos _ line col) len filename =

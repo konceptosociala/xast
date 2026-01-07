@@ -12,6 +12,7 @@ import Xast.Parser.Extern (ExternFunc, ExternType)
 import Control.Monad.Writer (WriterT (runWriterT), MonadWriter (tell))
 import Control.Monad.Identity (Identity (runIdentity))
 import Xast.Error
+import Xast.Parser.Headers (Module)
 
 type SemAnalyzer = 
    WriterT [SemInfo]
@@ -22,7 +23,11 @@ type SemAnalyzer =
          )
       )
 
-runSemAnalyzer :: Env -> SymTable -> SemAnalyzer a -> Identity ((a, [SemInfo]), SymTable)
+runSemAnalyzer 
+   :: Env 
+   -> SymTable 
+   -> SemAnalyzer a 
+   -> Identity ((a, [SemInfo]), SymTable)
 runSemAnalyzer env symTable analyzer =
    runStateT (runReaderT (runWriterT analyzer) env) symTable
 
@@ -48,12 +53,15 @@ data Env = Env
 emptyEnv :: Env
 emptyEnv = Env M.empty M.empty M.empty
 
+data QualifiedName = QualifiedName Module Ident
+   deriving (Eq, Show, Ord)
+
 data SymTable = SymTable
-   { symTypes :: M.Map Ident (Located TypeDef)
-   , symFns :: M.Map Ident (Located FuncDef)
-   , symSystems :: M.Map Ident (Located SystemDef)
-   , symExternFns :: M.Map Ident (Located ExternFunc)
-   , symExternTypes :: M.Map Ident (Located ExternType)
+   { symTypes :: M.Map QualifiedName (Located TypeDef)
+   , symFns :: M.Map QualifiedName (Located FuncDef)
+   , symSystems :: M.Map QualifiedName (Located SystemDef)
+   , symExternFns :: M.Map QualifiedName (Located ExternFunc)
+   , symExternTypes :: M.Map QualifiedName (Located ExternType)
    }
    deriving (Eq, Show)
 
