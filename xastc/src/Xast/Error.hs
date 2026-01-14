@@ -5,13 +5,13 @@ import Text.Megaparsec
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Void (Void)
-import Xast.Parser.Headers (Module, moduleToPath)
+import Xast.Parser.Headers (Module, moduleToPath, ImportIntersection (InterModule, InterSelect))
 import Error.Diagnose
 import Error.Diagnose.Compat.Megaparsec (errorDiagnosticFromBundle, HasHints(..))
-import Xast.Utils (bold, red)
-import Xast.Parser (Location (Location))
+import Xast.Utils (bold, red, yellow)
+import Xast.Parser (Location (Location, lPos), Located (Located, lLocation))
 import Xast.Parser.Ident (Ident)
-import Control.Monad (forM_)
+import Control.Monad (forM_, unless)
 import Data.List (intercalate)
 
 instance HasHints Void String where
@@ -54,7 +54,7 @@ data SemError
 data SemWarning
    = SWUnusedImport Module
    | SWDeadCode Ident
-   | SWDuplicateImport Location [Location]
+   | SWRedundantImport ImportIntersection
    deriving Show
 
 data XastError
@@ -65,7 +65,48 @@ data XastError
    deriving Show
 
 printWarnings :: [SemWarning] -> IO ()
-printWarnings warns = forM_ warns print
+printWarnings warns = forM_ warns printWarning
+
+printWarning :: SemWarning -> IO ()
+printWarning (SWRedundantImport intr) = case intr of
+   InterModule (Located (Location pos _ len) module_) -> do
+      let filename = sourceName pos
+      file <- readFile filename
+
+      let report =
+            Warn
+            Nothing
+            ("Redundant module import: " <> show (yellow (bold (show module_))))
+            [ (toPosition pos len filename, Where "Module is imported here")
+            ]
+            []
+
+      let diagnostic = addFile mempty filename file
+      printDiagnostic stdout WithUnicode (TabSize 4) defaultStyle $ addReport diagnostic report
+
+   InterSelect module_ xs -> unless (null xs) $ do
+      let dat = flip map xs $
+            \(Located loc ident) ->
+               let Location pos _ len = loc
+                   filename = sourceName pos
+               in (ident, (toPosition pos len filename, Where "remove this import"))
+
+      let filename = (sourceName . lPos . lLocation . head) xs
+      file <- readFile filename
+
+      let report =
+            Warn
+            Nothing
+            ( "Redundant imports in module " <> show (yellow (bold (show module_))) <> ": "
+               <> intercalate ", " (map (show . fst) dat)
+            )
+            (map snd dat)
+            []
+
+      let diagnostic = addFile mempty filename file
+      printDiagnostic stdout WithUnicode (TabSize 4) defaultStyle $ addReport diagnostic report
+
+printWarning _ = undefined
 
 class PrintError a where
    printError :: a -> IO ()
@@ -113,14 +154,14 @@ instance PrintError SemError where
             ]
             [Note "A module cannot import itself. Remove this import statement."]
 
-      let diagnostic  = addFile mempty filename file
+      let diagnostic = addFile mempty filename file
       printDiagnostic stdout WithUnicode (TabSize 4) defaultStyle $ addReport diagnostic report
 
    printError (SECyclicImportError modules loc) = do
       let Location pos _ len = loc
       let filename = sourceName pos
       let cycleT = intercalate " ─▶ " (map show modules)
-      
+
       file <- readFile filename
 
       let report =
@@ -131,7 +172,7 @@ instance PrintError SemError where
             ]
             []
 
-      let diagnostic  = addFile mempty filename file
+      let diagnostic = addFile mempty filename file
       printDiagnostic stdout WithUnicode (TabSize 4) defaultStyle $ addReport diagnostic report
 
    printError unimplemented = error $ "Unimplemented SA Error: " ++ show unimplemented

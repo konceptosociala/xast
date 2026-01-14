@@ -2,7 +2,7 @@ module Xast.SemAnalyzer.Analysis where
 
 import qualified Data.Map as M
 import Control.Monad.State (MonadState(..), MonadIO (liftIO))
-import Control.Monad (forM_, unless)
+import Control.Monad (forM_, unless, when)
 import Xast.SemAnalyzer (SemAnalyzer, SymTable (..), errSem, emptyEnv, emptySymTable, runPhase, QualifiedName (QualifiedName), warnSem)
 import Xast.Parser (Located (..), Location)
 import Xast.Parser.Function (FuncDef (..), Func (..))
@@ -10,25 +10,22 @@ import Xast.Parser.Type (TypeDef (..))
 import Xast.Parser.Extern (ExternFunc(..), ExternType(..), Extern (..))
 import Xast.Parser.System (SystemDef(..), System (SysDef))
 import Xast.Parser.Program (Program(..), Stmt (..))
-import Xast.Parser.Headers (ModuleDef(ModuleDef), ImportDef (ImportDef), Module)
-import Xast.Error (SemError(..), printWarnings, SemWarning (SWDuplicateImport))
+import Xast.Parser.Headers (ModuleDef(ModuleDef), ImportDef (ImportDef), Module, intersectImport)
+import Xast.Error (SemError(..), printWarnings, SemWarning (SWRedundantImport))
 import Control.Monad.Except (runExceptT, ExceptT(..))
 import qualified Data.Set as S
-import Xast.Utils (allEqual)
-import Data.Function ((&))
+import Xast.Utils (allEqual, pairs)
+import Data.Maybe (mapMaybe)
 
 -- checkTypes :: Program -> SemAnalyzer ()
 -- checkTypes 
 
-resolveDuplicateImports :: Program -> SemAnalyzer ()
-resolveDuplicateImports (Program _ _ imports _) =
-   forM_ imports $ \this ->
-      let others = imports
-            & filter (== this)
-            & map lLocation
-
-      in unless (null others) $ 
-         warnSem (SWDuplicateImport (lLocation this) others)
+resolveRedundantImports :: Program -> SemAnalyzer ()
+resolveRedundantImports (Program _ _ imports _) =
+   when (length imports >= 2) $
+      let intr = mapMaybe (uncurry intersectImport) (pairs imports)
+      in forM_ intr $ 
+         \i -> warnSem (SWRedundantImport i)
 
 resolveCyclicImports :: [Program] -> SemAnalyzer ()
 resolveCyclicImports progs = do
@@ -88,9 +85,9 @@ importAnalysis :: [Program] -> SemAnalyzer ()
 importAnalysis progs = do
    forM_ progs resolveSelfImport
    resolveCyclicImports progs
-   forM_ progs resolveDuplicateImports
+   forM_ progs resolveRedundantImports
 
-fullAnalysis :: [Program] -> IO (Either [SemError] ())
+fullAnalysis :: [Program] -> IO (Either [SemError] Int)
 fullAnalysis progs = runExceptT $ do
    let env = emptyEnv
        st0 = emptySymTable
@@ -101,10 +98,10 @@ fullAnalysis progs = runExceptT $ do
    (_, warns2) <- ExceptT $ pure $ runPhase env st1 (importAnalysis progs)
    liftIO $ printWarnings warns2
 
-   return ()
+   return $ sum $ map length [warns1, warns2]
 
 declareStmts :: Program -> SemAnalyzer ()
-declareStmts (Program _ (Located _ (ModuleDef module_ _)) _ stmts) = 
+declareStmts (Program _ (Located _ (ModuleDef module_ _)) _ stmts) =
    forM_ stmts (declareStmt module_)
 
 declareStmt :: Module -> Stmt -> SemAnalyzer ()
@@ -131,10 +128,10 @@ declareFn name@(QualifiedName _ ident) fd@(Located newLoc _) = do
    st <- get
 
    case M.lookup name (symFns st) of
-      Just (Located oldLoc _) -> 
+      Just (Located oldLoc _) ->
          errSem (SEFnRedeclaration ident oldLoc newLoc)
 
-      Nothing -> 
+      Nothing ->
          put st { symFns = M.insert name fd (symFns st) }
 
 declareType :: QualifiedName -> Located TypeDef -> SemAnalyzer ()

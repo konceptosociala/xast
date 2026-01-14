@@ -38,7 +38,7 @@ runPhase
    -> Either [SemError] (SymTable, [SemWarning])
 runPhase env st phase =
    let (((), infos), st') = runIdentity (runSemAnalyzer env st phase)
-       errors = [ e | SemError e <- infos ]
+       errors   = [ e | SemError e <- infos ]
        warnings = [ w | SemWarning w <- infos ]
    in if null errors
       then Right (st', warnings)

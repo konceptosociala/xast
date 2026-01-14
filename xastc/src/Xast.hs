@@ -29,9 +29,17 @@ runCompile dir = runCompile_ dir >>= \case
          ++ show (red (bold (" errors." :: String)))
          )
 
-   Right () -> print $ green $ bold ("Compilation completed." :: String)
+   Right 0 -> 
+      print $ green $ bold ("Compilation completed." :: String)
 
-runCompile_ :: Maybe FilePath -> IO (Either [XastError] ())
+   Right warnings -> 
+      putStrLn 
+         (  show (green (bold ("Compilation completed " :: String)))
+         ++ show (yellow (bold ("with " <> show warnings <> " warnings")))
+         ++ show (green (bold ("." :: String)))
+         )
+
+runCompile_ :: Maybe FilePath -> IO (Either [XastError] Int)
 runCompile_ dir = runExceptT $ do
    -- Get current dir
    currentDir <- liftIO $ maybe getCurrentDirectory (pure . dropWhileEnd (== '/')) dir
@@ -61,8 +69,6 @@ runCompile_ dir = runExceptT $ do
    -- Semantic analysis
    result <- liftIO $ fullAnalysis programs
    ExceptT $ pure $ first (map XastSemAnalyzeError) result
-
-   return ()
 
 parseOne :: FilePath -> Module -> IO (Either XastError Program)
 parseOne currentDir module_ = runExceptT $ do

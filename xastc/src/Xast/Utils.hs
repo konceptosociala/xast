@@ -2,6 +2,10 @@ module Xast.Utils where
 
 import qualified Data.Set as S
 
+pairs :: [a] -> [(a,a)]
+pairs []     = []
+pairs (x:xs) = [(x,y) | y <- xs] ++ pairs xs
+
 allEqual :: Ord a => [a] -> Bool
 allEqual xs =
    all

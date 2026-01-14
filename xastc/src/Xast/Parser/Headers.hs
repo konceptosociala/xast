@@ -5,11 +5,12 @@ module Xast.Parser.Headers
    ( ImportDef(..), importDef
    , ModuleDef(..), moduleDef
    , Module(..), module'
-   , moduleToPath
+   , moduleToPath 
+   , ImportIntersection(..), intersectImport
    ) where
 
 import Xast.Parser.Ident (Ident (Ident), typeIdent, fnIdent)
-import Xast.Parser (Parser, symbol, Located, located)
+import Xast.Parser (Parser, symbol, Located (Located), located)
 import Text.Megaparsec (sepBy1, between, (<|>), choice)
 import Data.Text (unpack)
 
@@ -17,6 +18,7 @@ newtype Module = Module [Ident]
    deriving (Eq, Ord)
 
 instance Show Module where
+   show :: Module -> String
    show (Module []) = undefined
    show (Module [x]) = show x
    show (Module (x:xs)) = show x ++ "." ++ show (Module xs)
@@ -68,15 +70,49 @@ importDef = located $ do
    return ImportDef {..}
 
 data ImportPayload
-   = ImpAlias Ident
-   | ImpSelect [Ident]
+   = ImpAlias (Located Ident)
+   | ImpSelect [Located Ident]
    | ImpFull
    deriving (Eq, Show, Ord)
 
+data ImportIntersection
+   = InterModule (Located Module)
+   | InterSelect Module [Located Ident]
+   deriving (Eq, Show, Ord)
+
+intersectIdents :: [Located Ident] -> [Located Ident] -> [Located Ident]
+intersectIdents as bs = [b | b@(Located _ bi) <- bs, any (\(Located _ ai) -> ai == bi) as]
+
+intersectImport
+   :: Located ImportDef
+   -> Located ImportDef
+   -> Maybe ImportIntersection
+intersectImport
+   (Located locA (ImportDef moduleA impA))
+   (Located locB (ImportDef moduleB impB)) =
+      if moduleA == moduleB then
+         case (impA, impB) of
+            (ImpFull, _) ->
+               Just (InterModule (Located locB moduleB))
+
+            (_, ImpFull) ->
+               Just (InterModule (Located locA moduleA))
+
+            (ImpSelect as, ImpSelect bs) ->
+               case intersectIdents as bs of
+                  [] ->
+                     Nothing
+                  others ->
+                     Just (InterSelect moduleB others)
+
+            _ -> Nothing
+      else
+         Nothing
+
 importPayload :: Parser ImportPayload
 importPayload = choice
-   [ ImpAlias   <$ symbol "as" <*> typeIdent
-   , ImpSelect  <$> between (symbol "{") (symbol "}") (importIdent `sepBy1` symbol ",")
+   [ ImpAlias   <$ symbol "as" <*> located typeIdent
+   , ImpSelect  <$> between (symbol "{") (symbol "}") (located importIdent `sepBy1` symbol ",")
    , ImpFull    <$ symbol "*"
    ]
 
