@@ -1,14 +1,13 @@
+{-# LANGUAGE LambdaCase #-}
 module Xast.SemAnalyzer.Analysis where
 
 import qualified Data.Map as M
-import Control.Monad.State (MonadState(..), MonadIO (liftIO))
+import Control.Monad.State (MonadState(..), MonadIO (liftIO), modify, gets)
 import Control.Monad (forM_, unless, when)
-import Xast.SemAnalyzer (SemAnalyzer, SymTable (..), errSem, emptyEnv, emptySymTable, runPhase, QualifiedName (QualifiedName), warnSem)
+import Xast.SemAnalyzer (SemAnalyzer, SymTable (..), errSem, emptyEnv, emptySymTable, runPhase, QualifiedName (QualifiedName), warnSem, SymbolInfo (..), symbolLoc, emptyModuleInfo, ModuleInfo (modSymbols))
 import Xast.Parser (Located (..), Location)
 import Xast.Parser.Function (FuncDef (..), Func (..))
 import Xast.Parser.Type (TypeDef (..))
-import Xast.Parser.Extern (ExternFunc(..), ExternType(..), Extern (..))
-import Xast.Parser.System (SystemDef(..), System (SysDef))
 import Xast.Parser.Program (Program(..), Stmt (..))
 import Xast.Parser.Headers (ModuleDef(ModuleDef), ImportDef (ImportDef), Module, intersectImport)
 import Xast.Error (SemError(..), printWarnings, SemWarning (SWRedundantImport))
@@ -16,9 +15,15 @@ import Control.Monad.Except (runExceptT, ExceptT(..))
 import qualified Data.Set as S
 import Xast.Utils (allEqual, pairs)
 import Data.Maybe (mapMaybe)
+import Xast.Parser.Ident (Ident)
+import Xast.Parser.Extern (Extern(ExtFunc, ExtType), ExternFunc (ExternFunc), ExternType (ExternType))
+import Xast.Parser.System (System(SysDef), SystemDef (SystemDef))
 
 -- checkTypes :: Program -> SemAnalyzer ()
 -- checkTypes 
+
+-- resolveInvalidExports :: Program -> SemAnalyzer ()
+-- resolveInvalidExports
 
 resolveRedundantImports :: Program -> SemAnalyzer ()
 resolveRedundantImports (Program _ _ imports _) =
@@ -100,80 +105,75 @@ fullAnalysis progs = runExceptT $ do
 
    return $ sum $ map length [warns1, warns2]
 
-declareStmts :: Program -> SemAnalyzer ()
-declareStmts (Program _ (Located _ (ModuleDef module_ _)) _ stmts) =
-   forM_ stmts (declareStmt module_)
+qualify :: Ident -> SemAnalyzer QualifiedName
+qualify ident = do
+   module_ <- gets currentModule
+   return (QualifiedName module_ ident)
 
-declareStmt :: Module -> Stmt -> SemAnalyzer ()
-declareStmt module_ stmt = case stmt of
+enterModule :: Module -> SemAnalyzer ()
+enterModule m = do
+   st <- get
+   case M.lookup m (modules st) of
+      Just _ -> pure ()
+      Nothing ->
+         put st
+            { modules = M.insert m emptyModuleInfo (modules st)
+            }
+
+declareStmts :: Program -> SemAnalyzer ()
+declareStmts (Program _ (Located _ (ModuleDef module_ _)) _ stmts) = do
+   enterModule module_
+   modify $ \st -> st { currentModule = module_ }
+   forM_ stmts declareStmt
+
+declareStmt :: Stmt -> SemAnalyzer ()
+declareStmt = \case
    StmtFunc (FnDef fd@(Located _ (FuncDef ident _ _))) ->
-      declareFn (QualifiedName module_ ident) fd
+      declareFn ident fd
 
    StmtTypeDef td@(Located _ (TypeDef ident _ _)) ->
-      declareType (QualifiedName module_ ident) td
+      declareType ident td
 
    StmtExtern (ExtFunc ef@(Located _ (ExternFunc ident _ _))) ->
-      declareExternFn (QualifiedName module_ ident) ef
+      declareExternFn ident ef
 
    StmtExtern (ExtType et@(Located _ (ExternType ident _))) ->
-      declareExternType (QualifiedName module_ ident) et
+      declareExternType ident et
 
    StmtSystem (SysDef sd@(Located _(SystemDef _ ident _ _ _))) ->
-      declareSystem (QualifiedName module_ ident) sd
+      declareSystem ident sd
 
    _ -> return ()
 
-declareFn :: QualifiedName -> Located FuncDef -> SemAnalyzer ()
-declareFn name@(QualifiedName _ ident) fd@(Located newLoc _) = do
+declareSymbol :: Ident -> SymbolInfo -> SemAnalyzer ()
+declareSymbol ident sym = do
+   QualifiedName m _ <- qualify ident
    st <- get
+   let mi = M.findWithDefault emptyModuleInfo m (modules st)
 
-   case M.lookup name (symFns st) of
-      Just (Located oldLoc _) ->
-         errSem (SEFnRedeclaration ident oldLoc newLoc)
+   case M.lookup ident (modSymbols mi) of
+      Just old ->
+         errSem (SEFnRedeclaration ident (symbolLoc old) (symbolLoc sym))
 
       Nothing ->
-         put st { symFns = M.insert name fd (symFns st) }
+         put st
+            { modules =
+                  M.insert m
+                     mi { modSymbols = M.insert ident sym (modSymbols mi) }
+                     (modules st)
+            }
 
-declareType :: QualifiedName -> Located TypeDef -> SemAnalyzer ()
-declareType name@(QualifiedName _ ident) td@(Located newLoc _) = do
-   st <- get
+declareFn :: Ident -> Located FuncDef -> SemAnalyzer ()
+declareFn ident fd = declareSymbol ident (SymbolFn fd)
 
-   case M.lookup name (symTypes st) of
-      Just (Located oldLoc _) ->
-         errSem (SETypeRedeclaration ident oldLoc newLoc)
+declareType :: Ident -> Located TypeDef -> SemAnalyzer ()
+declareType ident td = declareSymbol ident (SymbolType td)
 
-      Nothing ->
-         put st { symTypes = M.insert name td (symTypes st) }
+declareExternFn :: Ident -> Located ExternFunc -> SemAnalyzer ()
+declareExternFn ident ef = declareSymbol ident (SymbolExternFn ef)
 
-declareExternFn :: QualifiedName -> Located ExternFunc -> SemAnalyzer ()
-declareExternFn name@(QualifiedName _ ident) ef@(Located newLoc _) = do
-   st <- get
+declareExternType :: Ident -> Located ExternType -> SemAnalyzer ()
+declareExternType ident et = declareSymbol ident (SymbolExternType et)
 
-   case M.lookup name (symExternFns st) of
-      Just (Located oldLoc _) ->
-         errSem (SEExternFnRedeclaration ident oldLoc newLoc)
-
-      Nothing ->
-         put st { symExternFns = M.insert name ef (symExternFns st) }
-
-declareExternType :: QualifiedName -> Located ExternType -> SemAnalyzer ()
-declareExternType name@(QualifiedName _ ident) et@(Located newLoc _) = do
-   st <- get
-
-   case M.lookup name (symExternTypes st) of
-      Just (Located oldLoc _) ->
-         errSem (SEExternTypeRedeclaration ident oldLoc newLoc)
-
-      Nothing ->
-         put st { symExternTypes = M.insert name et (symExternTypes st) }
-
-declareSystem :: QualifiedName -> Located SystemDef -> SemAnalyzer ()
-declareSystem name@(QualifiedName _ ident) sd@(Located newLoc _) = do
-   st <- get
-
-   case M.lookup name (symSystems st) of
-      Just (Located oldLoc _) ->
-         errSem (SESystemRedeclaration ident oldLoc newLoc)
-
-      Nothing ->
-         put st { symSystems = M.insert name sd (symSystems st) }
+declareSystem :: Ident -> Located SystemDef -> SemAnalyzer ()
+declareSystem ident sd = declareSymbol ident (SymbolSystem sd)

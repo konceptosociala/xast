@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Xast.SemAnalyzer where
 
 import qualified Data.Map as M
@@ -7,12 +8,13 @@ import Xast.Parser.Ident (Ident)
 import Xast.Parser.Type (Type, TypeDef)
 import Xast.Parser.Function (FuncDef (..))
 import Xast.Parser.System (SystemDef)
-import Xast.Parser (Located)
+import Xast.Parser (Located (Located), Location)
 import Xast.Parser.Extern (ExternFunc, ExternType)
 import Control.Monad.Writer (WriterT (runWriterT), MonadWriter (tell))
 import Control.Monad.Identity (Identity (runIdentity))
 import Xast.Error
-import Xast.Parser.Headers (Module)
+import Xast.Parser.Headers (Module (Module))
+import qualified Data.Set as S
 
 type SemAnalyzer = 
    WriterT [SemInfo]
@@ -56,17 +58,39 @@ emptyEnv = Env M.empty M.empty M.empty
 data QualifiedName = QualifiedName Module Ident
    deriving (Eq, Show, Ord)
 
+data ModuleInfo = ModuleInfo
+   { modSymbols :: M.Map Ident SymbolInfo
+   , modExports :: S.Set Ident
+   }
+   deriving (Eq, Show)
+
+emptyModuleInfo :: ModuleInfo
+emptyModuleInfo = ModuleInfo M.empty S.empty
+
+data SymbolInfo
+   = SymbolType (Located TypeDef)
+   | SymbolFn (Located FuncDef)
+   | SymbolSystem (Located SystemDef)
+   | SymbolExternFn (Located ExternFunc)
+   | SymbolExternType (Located ExternType)
+   deriving (Eq, Show)
+
+symbolLoc :: SymbolInfo -> Location
+symbolLoc = \case
+   SymbolType (Located loc _)       -> loc
+   SymbolFn (Located loc _)         -> loc
+   SymbolSystem (Located loc _)     -> loc
+   SymbolExternFn (Located loc _)   -> loc
+   SymbolExternType (Located loc _) -> loc
+
 data SymTable = SymTable
-   { symTypes :: M.Map QualifiedName (Located TypeDef)
-   , symFns :: M.Map QualifiedName (Located FuncDef)
-   , symSystems :: M.Map QualifiedName (Located SystemDef)
-   , symExternFns :: M.Map QualifiedName (Located ExternFunc)
-   , symExternTypes :: M.Map QualifiedName (Located ExternType)
+   { modules :: M.Map Module ModuleInfo
+   , currentModule :: Module
    }
    deriving (Eq, Show)
 
 emptySymTable :: SymTable
-emptySymTable = SymTable M.empty M.empty M.empty M.empty M.empty
+emptySymTable = SymTable M.empty (Module [])
 
 data VarInfo = VarInfo
    { varType :: Type
