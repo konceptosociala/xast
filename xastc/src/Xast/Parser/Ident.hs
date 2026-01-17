@@ -1,10 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
-
 module Xast.Parser.Ident where
 
 import Data.Text (Text, pack, unpack)
 import Text.Megaparsec.Char (upperChar, lowerChar, alphaNumChar)
 import Text.Megaparsec
+
 import Xast.Parser.Common
 import Xast.AST (Ident(..))
 

@@ -1,15 +1,16 @@
 {-# LANGUAGE LambdaCase #-}
 module Xast.SemAnalyzer.Analysis where
 
-import qualified Data.Map as M
+import Control.Monad.Except (runExceptT, ExceptT(..))
 import Control.Monad.State
 import Control.Monad (forM_, unless, when)
+import Data.Maybe (mapMaybe)
+import qualified Data.Set as S
+import qualified Data.Map as M
+
 import Xast.AST
 import Xast.Error.Types
-import Control.Monad.Except (runExceptT, ExceptT(..))
-import qualified Data.Set as S
 import Xast.Utils.List (allEqual, pairs)
-import Data.Maybe (mapMaybe)
 import Xast.SemAnalyzer.Monad
 import Xast.SemAnalyzer.Types
 import Xast.Error.Pretty (printWarnings)

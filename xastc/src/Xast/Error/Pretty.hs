@@ -1,17 +1,17 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 module Xast.Error.Pretty where
 
-import Text.Megaparsec
 import Control.Monad (forM_, unless)
-import Data.Text (Text)
+import Data.List (intercalate)
+import Data.Text (Text, unpack)
 import Data.Void (Void)
 import Error.Diagnose
 import Error.Diagnose.Compat.Megaparsec (HasHints (hints), errorDiagnosticFromBundle)
+import Text.Megaparsec
+
 import Xast.Error.Types
 import Xast.AST
 import Xast.Utils.Pretty
-import Data.List (intercalate)
-import qualified Data.Text as Text
 
 instance HasHints Void String where
    hints :: Void -> [Note String]
@@ -85,7 +85,7 @@ instance PrintError (ParseErrorBundle Text Void) where
    printError bundle = do
       let diagnostic = errorDiagnosticFromBundle Nothing "Parsing error" Nothing bundle
           filename = sourceName . pstateSourcePos . bundlePosState $ bundle
-          sourceText = Text.unpack . pstateInput . bundlePosState $ bundle
+          sourceText = unpack . pstateInput . bundlePosState $ bundle
           diagnosticWithFile = addFile diagnostic filename sourceText
       printDiagnostic stdout WithUnicode (TabSize 4) defaultStyle diagnosticWithFile
 

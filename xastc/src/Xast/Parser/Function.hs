@@ -1,13 +1,13 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
-
 module Xast.Parser.Function where
+
+import Text.Megaparsec (between, sepBy, choice, MonadParsec (try), many)
 
 import Xast.Parser.Type (type')
 import Xast.Parser.Ident (fnIdent, varIdent, typeIdent)
 import Xast.Parser.Expr (literal, expr)
 import Xast.Parser.Common
-import Text.Megaparsec (between, sepBy, choice, MonadParsec (try), many)
 import Xast.AST
 
 func :: Parser Func

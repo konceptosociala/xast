@@ -1,17 +1,17 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
-
 module Xast.Parser.System where
+
+import Control.Applicative (optional)
+import Data.Text (Text)
+import Data.Maybe (isJust)
+import Text.Megaparsec (between, sepBy1, (<|>), many, some, (<?>), MonadParsec (lookAhead), choice)
 
 import Xast.Parser.Common
 import Xast.Parser.Ident (typeIdent)
 import Xast.Parser.Type (type')
 import Xast.Parser.Function (pattern')
 import Xast.Parser.Expr (stringLiteral, expr)
-import Data.Text (Text)
-import Control.Applicative (optional)
-import Text.Megaparsec (between, sepBy1, (<|>), many, some, (<?>), MonadParsec (lookAhead), choice)
-import Data.Maybe (isJust)
 import Xast.AST
 
 system :: Parser System

@@ -1,11 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-
 module Xast.Parser.Headers where
+
+import Text.Megaparsec (sepBy1, between, (<|>), choice)
 
 import Xast.Parser.Ident (typeIdent, fnIdent)
 import Xast.Parser.Common (Parser, symbol, located)
-import Text.Megaparsec (sepBy1, between, (<|>), choice)
 import Xast.AST
 
 module' :: Parser Module

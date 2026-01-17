@@ -1,21 +1,22 @@
 {-# LANGUAGE LambdaCase #-}
-
 module Xast.Pipeline where
-import Xast.Error.Pretty (PrintError(printError))
-import Xast.Utils.Pretty
-import Data.Text (pack)
-import Data.List (dropWhileEnd)
-import System.Directory (getCurrentDirectory, doesFileExist)
+
 import Control.Monad (unless, filterM, forM_)
-import Xast.Config (parseConfig, XastConfiguration (xcModules))
 import Control.Monad.Except
 import Control.Monad.IO.Class (MonadIO(liftIO))
+import Data.Text (pack)
+import Data.List (dropWhileEnd)
+import Data.Bifunctor (Bifunctor(first))
+import Data.Either (partitionEithers)
+import System.Directory (getCurrentDirectory, doesFileExist)
+
+import Xast.Config (parseConfig, XastConfiguration (xcModules))
 import Xast.Error.Types (XastError (..))
 import Xast.Parser.Program (parseProgram)
 import Xast.AST
 import Xast.SemAnalyzer.Analysis (fullAnalysis)
-import Data.Bifunctor (Bifunctor(first))
-import Data.Either (partitionEithers)
+import Xast.Error.Pretty (PrintError(printError))
+import Xast.Utils.Pretty
 
 runCompile :: Maybe FilePath -> IO ()
 runCompile dir = runCompile_ dir >>= \case

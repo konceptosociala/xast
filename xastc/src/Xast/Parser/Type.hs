@@ -1,18 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+module Xast.Parser.Type where
 
-module Xast.Parser.Type
-   ( TypeDef(..), typeDef
-   , Type(..), type', atomType
-   , Field(..), field
-   , Payload(..), payload
-   , Ctor(..), ctor
-   ) where
+import Data.Function ((&))
+import Text.Megaparsec (choice, sepBy, between, some, MonadParsec (try), many, sepBy1)
 
 import Xast.Parser.Ident
 import Xast.Parser.Common (Parser, symbol, lexeme, endOfStmt, located)
-import Text.Megaparsec (choice, sepBy, between, some, MonadParsec (try), many, sepBy1)
-import Data.Function ((&))
 import Xast.AST
 
 typeDef :: Parser (Located TypeDef)

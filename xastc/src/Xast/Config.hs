@@ -2,17 +2,18 @@
 {-# LANGUAGE LambdaCase #-}
 module Xast.Config where
 
-import Xast.AST
-import Data.Text (Text, split, unpack)
-import Xast.Parser.Common (Parser)
-import Text.Megaparsec.Char (string, newline, space1)
 import Control.Monad (unless)
-import Text.Megaparsec
-import Xast.Parser.Expr (intLiteral, floatLiteral, stringLiteral)
+import Data.Text (Text, split, unpack)
 import Data.Functor (void)
-import Xast.Error.Types (XastError (XastParseError))
 import Data.Bifunctor (Bifunctor(first))
+import Text.Megaparsec.Char (string, newline, space1)
+import Text.Megaparsec
 import qualified Text.Megaparsec.Char.Lexer as L
+
+import Xast.Parser.Expr (intLiteral, floatLiteral, stringLiteral)
+import Xast.Parser.Common (Parser)
+import Xast.Error.Types (XastError (XastParseError))
+import Xast.AST
 
 data XastConfiguration = XastConfiguration
    { xcName :: Text

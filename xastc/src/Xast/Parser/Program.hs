@@ -2,8 +2,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Xast.Parser.Program where
 
+import Data.Bifunctor (Bifunctor(first))
 import Data.Text (Text, unpack)
 import Text.Megaparsec (MonadParsec (lookAhead, eof), some, many, (<|>), runParser)
+
 import Xast.Parser.Type (typeDef)
 import Xast.Parser.Function (func)
 import Xast.Parser.Common (Parser, symbol, sc)
@@ -12,7 +14,6 @@ import Xast.Parser.Expr (stringLiteral)
 import Xast.Parser.System (system)
 import Xast.Parser.Extern
 import Xast.Error.Types (XastError (XastParseError))
-import Data.Bifunctor (Bifunctor(first))
 import Xast.AST
 
 parseProgram :: String -> Text -> Either XastError Program

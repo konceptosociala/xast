@@ -3,9 +3,10 @@ module Xast.SemAnalyzer.Monad where
 import Control.Monad.Writer (WriterT (..), MonadWriter (tell))
 import Control.Monad.Reader (ReaderT (..))
 import Control.Monad.State (StateT (..))
+import Control.Monad.Identity
+
 import Xast.SemAnalyzer.Types
 import Xast.Error.Types
-import Control.Monad.Identity
 
 type SemAnalyzer = 
    WriterT [SemInfo]

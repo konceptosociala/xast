@@ -1,9 +1,10 @@
 {-# LANGUAGE LambdaCase #-}
 module Xast.SemAnalyzer.Types where
 
-import Xast.AST
 import qualified Data.Map as M
 import qualified Data.Set as S
+
+import Xast.AST
 
 data Env = Env
    { envVars :: M.Map Ident VarInfo

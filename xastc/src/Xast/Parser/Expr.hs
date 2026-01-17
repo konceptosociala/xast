@@ -1,16 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-
 module Xast.Parser.Expr where
 
-import Xast.AST
+import Control.Monad.Combinators.Expr
 import Data.Text (Text, pack)
-import Xast.Parser.Ident (varIdent, typeIdent, inferIdent)
-import Xast.Parser.Common (Parser, lexeme, symbol, located)
+import Text.Megaparsec.Char (char)
 import Text.Megaparsec
 import qualified Text.Megaparsec.Char.Lexer as L
-import Text.Megaparsec.Char (char)
-import Control.Monad.Combinators.Expr
+
+import Xast.AST
+import Xast.Parser.Ident (varIdent, typeIdent, inferIdent)
+import Xast.Parser.Common (Parser, lexeme, symbol, located)
 
 atomExpr :: Parser (Located Expr)
 atomExpr = located $ choice

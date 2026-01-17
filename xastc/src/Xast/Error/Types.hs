@@ -1,9 +1,10 @@
 module Xast.Error.Types where
 
-import Xast.AST
-import Text.Megaparsec (ParseErrorBundle)
 import Data.Text (Text)
 import Data.Void (Void)
+import Text.Megaparsec (ParseErrorBundle)
+
+import Xast.AST
 
 data SemInfo
    = SemWarning SemWarning

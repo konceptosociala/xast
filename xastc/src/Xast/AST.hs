@@ -1,8 +1,8 @@
 module Xast.AST where
 
+import GHC.Generics (Generic)
 import Data.Text (Text, unpack)
 import Text.Megaparsec (SourcePos)
-import GHC.Generics (Generic)
 
 data Located a = Located
    { lLocation :: Location
