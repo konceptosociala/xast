@@ -2,22 +2,17 @@
 module Xast.SemAnalyzer.Analysis where
 
 import qualified Data.Map as M
-import Control.Monad.State (MonadState(..), MonadIO (liftIO), modify, gets)
+import Control.Monad.State
 import Control.Monad (forM_, unless, when)
-import Xast.SemAnalyzer (SemAnalyzer, SymTable (..), errSem, emptyEnv, emptySymTable, runPhase, QualifiedName (QualifiedName), warnSem, SymbolInfo (..), symbolLoc, emptyModuleInfo, ModuleInfo (modSymbols))
-import Xast.Parser (Located (..), Location)
-import Xast.Parser.Function (FuncDef (..), Func (..))
-import Xast.Parser.Type (TypeDef (..))
-import Xast.Parser.Program (Program(..), Stmt (..))
-import Xast.Parser.Headers (ModuleDef(ModuleDef), ImportDef (ImportDef), Module, intersectImport)
-import Xast.Error (SemError(..), printWarnings, SemWarning (SWRedundantImport))
+import Xast.AST
+import Xast.Error.Types
 import Control.Monad.Except (runExceptT, ExceptT(..))
 import qualified Data.Set as S
-import Xast.Utils (allEqual, pairs)
+import Xast.Utils.List (allEqual, pairs)
 import Data.Maybe (mapMaybe)
-import Xast.Parser.Ident (Ident)
-import Xast.Parser.Extern (Extern(ExtFunc, ExtType), ExternFunc (ExternFunc), ExternType (ExternType))
-import Xast.Parser.System (System(SysDef), SystemDef (SystemDef))
+import Xast.SemAnalyzer.Monad
+import Xast.SemAnalyzer.Types
+import Xast.Error.Pretty (printWarnings)
 
 -- checkTypes :: Program -> SemAnalyzer ()
 -- checkTypes 

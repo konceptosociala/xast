@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Main (main) where
 
 import Test.HUnit
@@ -278,13 +276,13 @@ testParseLiteral = TestCase $ do
 
 testParsePattern :: Test
 testParsePattern = TestCase $ do
-   assertParses pattern "_" PatWildcard
-   assertParses pattern "x" (PatVar (Ident "x"))
-   assertParses pattern "Just x" (PatCon (Ident "Just") [PatVar (Ident "x")])
-   assertParses pattern "Nothing" (PatCon (Ident "Nothing") [])
-   assertParses pattern "(x, y)" (PatTuple [PatVar (Ident "x"), PatVar (Ident "y")])
-   assertParses pattern "(x, Just y)" (PatTuple [PatVar (Ident "x"), PatCon (Ident "Just") [PatVar (Ident "y")]])
-   assertParses pattern "[1, 2, 3]"
+   assertParses pattern' "_" PatWildcard
+   assertParses pattern' "x" (PatVar (Ident "x"))
+   assertParses pattern' "Just x" (PatCon (Ident "Just") [PatVar (Ident "x")])
+   assertParses pattern' "Nothing" (PatCon (Ident "Nothing") [])
+   assertParses pattern' "(x, y)" (PatTuple [PatVar (Ident "x"), PatVar (Ident "y")])
+   assertParses pattern' "(x, Just y)" (PatTuple [PatVar (Ident "x"), PatCon (Ident "Just") [PatVar (Ident "y")]])
+   assertParses pattern' "[1, 2, 3]"
       (PatLit
          (LitList 
             [ LitInt 1
@@ -293,14 +291,14 @@ testParsePattern = TestCase $ do
             ]
          )
       )
-   assertParses pattern "[1, 2, x]"
+   assertParses pattern' "[1, 2, x]"
       (PatList 
          [ PatLit (LitInt 1)
          , PatLit (LitInt 2)
          , PatVar (Ident "x")
          ]
       )
-   assertParses pattern "(a, _, \"b\", True)" 
+   assertParses pattern' "(a, _, \"b\", True)" 
       (PatTuple 
          [ PatVar (Ident "a")
          , PatWildcard
@@ -308,20 +306,20 @@ testParsePattern = TestCase $ do
          , PatCon (Ident "True") []
          ]
       )
-   assertParses pattern "[]" (PatLit (LitList []))
-   assertParses pattern "[x, 1, y]" 
+   assertParses pattern' "[]" (PatLit (LitList []))
+   assertParses pattern' "[x, 1, y]" 
       (PatList 
          [ PatVar (Ident "x")
          , PatLit (LitInt 1)
          , PatVar (Ident "y")
          ]
       )
-   assertParses pattern "\"abc\"" (PatLit (LitString "abc"))
-   assertParses pattern "42" (PatLit (LitInt 42))
-   assertParses pattern "True" (PatCon (Ident "True") [])
-   assertFails pattern "(a, b"
-   assertFails pattern "[x, y"
-   assertFails pattern "\"abc"
+   assertParses pattern' "\"abc\"" (PatLit (LitString "abc"))
+   assertParses pattern' "42" (PatLit (LitInt 42))
+   assertParses pattern' "True" (PatCon (Ident "True") [])
+   assertFails pattern' "(a, b"
+   assertFails pattern' "[x, y"
+   assertFails pattern' "\"abc"
 
 -- Tests
 

@@ -10,16 +10,10 @@ module Xast.Parser.Type
    ) where
 
 import Xast.Parser.Ident
-import Xast.Parser (Parser, symbol, lexeme, endOfStmt, Located, located)
+import Xast.Parser.Common (Parser, symbol, lexeme, endOfStmt, located)
 import Text.Megaparsec (choice, sepBy, between, some, MonadParsec (try), many, sepBy1)
 import Data.Function ((&))
-
-data TypeDef = TypeDef
-   { tdName       :: Ident
-   , tdGenerics   :: [Ident]
-   , tdCtors      :: [Located Ctor]
-   }
-   deriving (Eq, Show)
+import Xast.AST
 
 typeDef :: Parser (Located TypeDef)
 typeDef = located $ do
@@ -32,23 +26,11 @@ typeDef = located $ do
 
    return TypeDef {..}
 
-data Ctor = Ctor
-   { ctorName     :: Ident
-   , ctorPayload  :: Payload
-   }
-   deriving (Eq, Show)
-
 ctor :: Parser (Located Ctor)
 ctor = located $ do
    ctorName    <- typeIdent
    ctorPayload <- payload
    return Ctor {..}
-
-data Payload
-   = PUnit
-   | PTuple [Type]
-   | PRecord [Field]
-   deriving (Eq, Show)
 
 payload :: Parser Payload
 payload = choice
@@ -57,12 +39,6 @@ payload = choice
    , PUnit     & pure
    ]
 
-data Field = Field      -- fieldOne : Int
-   { fldName :: Ident   -- field2 : Maybe Bool
-   , fldType :: Type
-   }
-   deriving (Eq, Show)
-
 field :: Parser Field
 field = do
    fldName <- varIdent
@@ -70,14 +46,6 @@ field = do
    fldType <- type'
 
    return Field {..}
-
-data Type
-   = TyGnr Ident        -- a, b, c...
-   | TyCon Ident        -- Bool, Int, String
-   | TyApp Type Type    -- Maybe a, Either a Int...
-   | TyTuple [Type]     -- (Bool, a, Maybe String)
-   | TyFn [Type] Type   -- fn(Type1, Type2 ... TypeN) -> TypeRet
-   deriving (Eq, Show)
 
 type' :: Parser Type
 type' = do

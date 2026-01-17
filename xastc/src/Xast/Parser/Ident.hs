@@ -1,23 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Xast.Parser.Ident
-   ( Ident(..)
-   , typeIdent, fnIdent, genericIdent, varIdent, inferIdent
-   , reserved, builtin
-   ) where
+module Xast.Parser.Ident where
 
 import Data.Text (Text, pack, unpack)
-import GHC.Generics (Generic)
 import Text.Megaparsec.Char (upperChar, lowerChar, alphaNumChar)
 import Text.Megaparsec
-import Xast.Parser
-
-newtype Ident = Ident { unIdent :: Text }
-   deriving (Eq, Ord, Generic)
-
-instance Show Ident where
-   show :: Ident -> String
-   show = unpack . unIdent
+import Xast.Parser.Common
+import Xast.AST (Ident(..))
 
 reserved :: [Text]
 reserved = 
@@ -28,7 +17,7 @@ reserved =
    ]
 
 builtin :: [Text]
-builtin = 
+builtin =
    -- Functions
    [ "opAdd", "opSub", "opMul", "opDiv", "opMod"
    , "opPow", "opEq", "opNeq", "opAnd", "opOr"

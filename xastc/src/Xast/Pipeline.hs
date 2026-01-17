@@ -1,19 +1,19 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
-module Xast (runCompile) where
 
+module Xast.Pipeline where
+import Xast.Error.Pretty (PrintError(printError))
+import Xast.Utils.Pretty
 import Data.Text (pack)
 import Data.List (dropWhileEnd)
 import System.Directory (getCurrentDirectory, doesFileExist)
 import Control.Monad (unless, filterM, forM_)
-import Xast.Parser.Config (parseConfig, XastConfiguration (xcModules))
+import Xast.Config (parseConfig, XastConfiguration (xcModules))
 import Control.Monad.Except
 import Control.Monad.IO.Class (MonadIO(liftIO))
-import Xast.Error (XastError (..), PrintError (printError))
-import Xast.Parser.Program (Program, parseProgram)
-import Xast.Parser.Headers (Module, moduleToPath)
+import Xast.Error.Types (XastError (..))
+import Xast.Parser.Program (parseProgram)
+import Xast.AST
 import Xast.SemAnalyzer.Analysis (fullAnalysis)
-import Xast.Utils (green, bold, red, yellow)
 import Data.Bifunctor (Bifunctor(first))
 import Data.Either (partitionEithers)
 

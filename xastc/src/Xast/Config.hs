@@ -1,17 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
-module Xast.Parser.Config where
+module Xast.Config where
 
+import Xast.AST
 import Data.Text (Text, split, unpack)
-import Xast.Parser.Headers (Module(..))
-import Xast.Parser (Parser)
-import Xast.Parser.Ident (Ident(..))
+import Xast.Parser.Common (Parser)
 import Text.Megaparsec.Char (string, newline, space1)
 import Control.Monad (unless)
 import Text.Megaparsec
 import Xast.Parser.Expr (intLiteral, floatLiteral, stringLiteral)
 import Data.Functor (void)
-import Xast.Error (XastError (XastParseError))
+import Xast.Error.Types (XastError (XastParseError))
 import Data.Bifunctor (Bifunctor(first))
 import qualified Text.Megaparsec.Char.Lexer as L
 

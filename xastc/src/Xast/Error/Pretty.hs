@@ -1,68 +1,21 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
-module Xast.Error where
+module Xast.Error.Pretty where
 
 import Text.Megaparsec
-import Data.Text (Text)
-import qualified Data.Text as Text
-import Data.Void (Void)
-import Xast.Parser.Headers (Module, moduleToPath, ImportIntersection (InterModule, InterSelect))
-import Error.Diagnose
-import Error.Diagnose.Compat.Megaparsec (errorDiagnosticFromBundle, HasHints(..))
-import Xast.Utils (bold, red, yellow)
-import Xast.Parser (Location (Location, lPos), Located (Located, lLocation))
-import Xast.Parser.Ident (Ident)
 import Control.Monad (forM_, unless)
+import Data.Text (Text)
+import Data.Void (Void)
+import Error.Diagnose
+import Error.Diagnose.Compat.Megaparsec (HasHints (hints), errorDiagnosticFromBundle)
+import Xast.Error.Types
+import Xast.AST
+import Xast.Utils.Pretty
 import Data.List (intercalate)
+import qualified Data.Text as Text
 
 instance HasHints Void String where
    hints :: Void -> [Note String]
    hints _ = []
-
--- instance Show SemError where
---    show (SEUndefinedVar ident) =
---       "Undefined variable `" ++ show ident ++ "`"
---    show (SETypeRedeclaration ident) =
---       "Redeclaration of type `" ++ show ident ++ "`"
---    show (SEFnRedeclaration ident) =
---       "Redeclaration of function `" ++ show ident ++ "`"
---    show (SEExternFnRedeclaration ident) =
---       "Redeclaration of extern function `" ++ show ident ++ "`"
---    show (SEExternTypeRedeclaration ident) =
---       "Redeclaration of extern type `" ++ show ident ++ "`"
---    show (SESystemRedeclaration ident) =
---       "Redeclaration of system `" ++ show ident ++ "`"
---    show (SEModuleRedeclaration idents) =
---       "Redeclaration of module `" ++ intercalate "." (Prelude.map show idents) ++ "`"
-
-data SemInfo
-   = SemWarning SemWarning
-   | SemError SemError
-
-data SemError
-   = SESelfImportError Module Location Location
-   | SECyclicImportError [Module] Location
-   | SETypeRedeclaration Ident Location Location
-   | SEFnRedeclaration Ident Location Location
-   | SEExternFnRedeclaration Ident Location Location
-   | SEExternTypeRedeclaration Ident Location Location
-   | SESystemRedeclaration Ident Location Location
-
-   | SEModuleRedeclaration [Ident]
-   | SEUndefinedVar Ident
-   deriving Show
-
-data SemWarning
-   = SWUnusedImport Module
-   | SWDeadCode Ident
-   | SWRedundantImport ImportIntersection
-   deriving Show
-
-data XastError
-   = XastParseError (ParseErrorBundle Text Void)
-   | XastSemAnalyzeError SemError
-   | XastFileNotFound FilePath FilePath
-   | XastModuleNotFound Module FilePath
-   deriving Show
 
 printWarnings :: [SemWarning] -> IO ()
 printWarnings warns = forM_ warns printWarning

@@ -1,9 +1,4 @@
-module Xast.SemAnalyzer.Env where
-   
-import Xast.Parser.Ident (Ident)
-import Xast.SemAnalyzer
-import Control.Monad.Reader (MonadReader(ask))
-import qualified Data.Map as M
+module Xast.SemAnalyzer.Query where
 
 -- lookupVar :: Ident -> SemAnalyzer VarInfo
 -- lookupVar x = do

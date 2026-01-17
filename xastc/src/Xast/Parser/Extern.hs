@@ -1,29 +1,16 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Xast.Parser.Extern
-   ( ExternType(..), externType
-   , ExternFunc(..), externFunc
-   , Extern(..), extern
-   ) where
+module Xast.Parser.Extern where
 
-import Xast.Parser.Type (Type, type')
+import Xast.Parser.Type (type')
 import Xast.Parser.Ident
-import Xast.Parser (endOfStmt, Parser, symbol, (<->), Located, located)
+import Xast.Parser.Common (endOfStmt, Parser, symbol, (<->), located)
 import Text.Megaparsec (sepBy, between, many)
-
-data Extern = ExtFunc (Located ExternFunc) | ExtType (Located ExternType)
-   deriving (Eq, Show)
+import Xast.AST
 
 extern :: Parser Extern
 extern = (ExtFunc <$> externFunc) <-> (ExtType <$> externType)
-
-data ExternFunc = ExternFunc
-   { efnName :: Ident
-   , efnArgs :: [Type]
-   , efnRet :: Type
-   }
-   deriving (Eq, Show)
 
 externFunc :: Parser (Located ExternFunc)
 externFunc = located $ do
@@ -36,12 +23,6 @@ externFunc = located $ do
    _        <- endOfStmt
 
    return ExternFunc {..}
-
-data ExternType = ExternType
-   { etName :: Ident
-   , etGenerics :: [Ident]
-   }
-   deriving (Eq, Show)
 
 externType :: Parser (Located ExternType)
 externType = located $ do

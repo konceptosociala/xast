@@ -1,6 +1,6 @@
 module Main where
 
-import Xast (runCompile)
+import Xast.Pipeline (runCompile)
 import System.Environment (getArgs)
 
 main :: IO ()

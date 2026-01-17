@@ -4,27 +4,20 @@ module Xast.Parser.Program where
 
 import Data.Text (Text, unpack)
 import Text.Megaparsec (MonadParsec (lookAhead, eof), some, many, (<|>), runParser)
-import Xast.Parser.Type (TypeDef, typeDef)
-import Xast.Parser.Function (Func, func)
-import Xast.Parser (Parser, symbol, sc, Located)
-import Xast.Parser.Headers (ModuleDef, ImportDef, moduleDef, importDef)
+import Xast.Parser.Type (typeDef)
+import Xast.Parser.Function (func)
+import Xast.Parser.Common (Parser, symbol, sc)
+import Xast.Parser.Headers (moduleDef, importDef)
 import Xast.Parser.Expr (stringLiteral)
-import Xast.Parser.System (System, system)
+import Xast.Parser.System (system)
 import Xast.Parser.Extern
-import Xast.Error (XastError (XastParseError))
+import Xast.Error.Types (XastError (XastParseError))
 import Data.Bifunctor (Bifunctor(first))
+import Xast.AST
 
 parseProgram :: String -> Text -> Either XastError Program
 parseProgram filename code = first XastParseError $ 
    runParser (sc *> program <* eof) filename code
-
-data Program = Program 
-   { progMode :: Mode
-   , progModuleDef :: Located ModuleDef
-   , progImports :: [Located ImportDef]
-   , progStmts :: [Stmt]
-   }
-   deriving (Eq, Show)
 
 program :: Parser Program
 program = do
@@ -35,9 +28,6 @@ program = do
 
    return Program { .. }
 
-data Mode = MStrict | MSafe | MDynamic
-   deriving (Eq, Show)
-
 mode :: Parser Mode
 mode = do
    str <- symbol "@mode" *> symbol "=" *> stringLiteral
@@ -47,13 +37,6 @@ mode = do
       "safe"    -> return MSafe
       "dynamic" -> return MDynamic
       other     -> fail ("Invalid mode `" ++ unpack other ++ "`; expected strict|safe|dynamic")
-
-data Stmt
-   = StmtTypeDef (Located TypeDef)
-   | StmtFunc Func
-   | StmtExtern Extern
-   | StmtSystem System
-   deriving (Eq, Show)
 
 stmtKeyword :: Parser Text
 stmtKeyword = "extern" <|> "fn" <|> "type" <|> "system"

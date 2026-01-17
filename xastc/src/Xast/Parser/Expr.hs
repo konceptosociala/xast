@@ -1,37 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Xast.Parser.Expr
-   ( Expr(..), expr
-   , Literal(..), literal
-   , LetIn(..), letIn
-   , stringLiteral
-   , intLiteral
-   , floatLiteral
-   ) where
+module Xast.Parser.Expr where
 
+import Xast.AST
 import Data.Text (Text, pack)
-import Xast.Parser.Ident (Ident (Ident), varIdent, typeIdent, inferIdent)
-import Xast.Parser (Parser, lexeme, symbol, Located(..), located, Location (Location))
-import Text.Megaparsec (choice, manyTill, between, sepBy, MonadParsec (try), some, sepBy1, optional, getSourcePos, getOffset, (<|>))
+import Xast.Parser.Ident (varIdent, typeIdent, inferIdent)
+import Xast.Parser.Common (Parser, lexeme, symbol, located)
+import Text.Megaparsec
 import qualified Text.Megaparsec.Char.Lexer as L
 import Text.Megaparsec.Char (char)
 import Control.Monad.Combinators.Expr
-
-type ModBind = Maybe Ident
-
-data Expr
-   = ExpVar ModBind Ident                 -- add, a
-   | ExpCon ModBind Ident                 -- Nothing, Just
-   | ExpTuple [Located Expr]              -- (pos, Event (p, pos));
-   | ExpList [Located Expr]               -- [a, 12, b, c]
-   | ExpLit Literal                       -- "abc", 12, ()
-   | ExpLambda Lambda                     -- .\x y -> x + y
-   | ExpApp (Located Expr) (Located Expr) -- Just 12, func a b
-   | ExpLetIn LetIn                       -- let a = 1 and let b = 2 in ...
-   | ExpIfThen IfThenElse                 -- if ... then ... else ...
-   -- | ExpMatch Match                    -- match EXPR of 
-   deriving (Eq, Show)
 
 atomExpr :: Parser (Located Expr)
 atomExpr = located $ choice
@@ -60,25 +39,6 @@ term = do
    where
       app l@(Located (Location posL offL _) _) r@(Located (Location _ offR lenR) _) =
          Located (Location posL offL ((offR + lenR) - offL)) (ExpApp l r)
-
-data BuiltinOp 
-   -- Math
-   = OpPlus    -- +
-   | OpNeg     -- -
-   | OpMinus   -- -
-   | OpMul     -- *
-   | OpDiv     -- /
-   | OpMod     -- %
-   | OpPow     -- **
-   -- Logical
-   | OpEq      -- ==
-   | OpNeq     -- !=
-   | OpAnd     -- &&
-   | OpOr      -- ||   
-   | OpNot     -- !
-   | OpPipe    -- |>
-   | OpConcat  -- <>
-   deriving (Eq, Show)
 
 opIdent :: BuiltinOp -> Ident
 opIdent op = case op of
@@ -166,15 +126,6 @@ unary op = do
 expr :: Parser (Located Expr)
 expr = makeExprParser term table
 
--- data Match = Match deriving (Eq, Show)
-
-data IfThenElse = IfThenElse
-   { iteIf :: Located Expr
-   , iteThen :: Located Expr
-   , iteElse :: Located Expr
-   }
-   deriving (Eq, Show)
-
 ifThenElse :: Parser IfThenElse
 ifThenElse = do
    _        <- symbol "if"
@@ -186,12 +137,6 @@ ifThenElse = do
 
    return IfThenElse {..}
 
-data Lambda = Lambda
-   { lamArgs :: [Ident]
-   , lamBody :: Located Expr
-   }
-   deriving (Eq, Show)
-
 lambda :: Parser Lambda
 lambda = do
    _        <- symbol ".\\"
@@ -201,12 +146,6 @@ lambda = do
 
    return Lambda {..}
 
-data LetIn = LetIn
-   { linBind :: [Located Let]
-   , linExpr :: Located Expr
-   }
-   deriving (Eq, Show)
-
 letIn :: Parser LetIn
 letIn = do
    linBind <- let' `sepBy1` symbol "and"
@@ -214,12 +153,6 @@ letIn = do
    linExpr <- expr
 
    return LetIn {..}
-
-data Let = Let
-   { letIdent :: Ident
-   , letValue :: Located Expr
-   }
-   deriving (Eq, Show)
 
 let' :: Parser (Located Let)
 let' = located $ do
@@ -229,15 +162,6 @@ let' = located $ do
    letValue  <- expr
 
    return Let {..}
-
-data Literal
-   = LitString Text
-   | LitChar Char
-   | LitInt Int
-   | LitFloat Float
-   | LitList [Literal]
-   | LitTuple [Literal]
-   deriving (Eq, Show)
 
 literal :: Parser Literal
 literal = choice

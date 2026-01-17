@@ -14,25 +14,30 @@ common warnings
 library
     import:           warnings
     exposed-modules:  
-        Xast,
-        Xast.Error,
-        Xast.Utils,
+        Xast.AST,
+        Xast.Config,
+        Xast.Pipeline,
 
-        Xast.Parser,
-        Xast.Parser.Ident,
-        Xast.Parser.Type,
-        Xast.Parser.Function,
+        Xast.Error.Pretty,
+        Xast.Error.Types,
+
+        Xast.Parser.Common,
         Xast.Parser.Expr,
-        Xast.Parser.System,
-        Xast.Parser.Headers,
         Xast.Parser.Extern,
+        Xast.Parser.Function,
+        Xast.Parser.Headers,
+        Xast.Parser.Ident,
         Xast.Parser.Program,
-        Xast.Parser.Config,
+        Xast.Parser.System,
+        Xast.Parser.Type,
 
-        Xast.SemAnalyzer,
-        Xast.SemAnalyzer.Env,
-        Xast.SemAnalyzer.SymTable,
-        Xast.SemAnalyzer.Analysis
+        Xast.SemAnalyzer.Analysis,
+        Xast.SemAnalyzer.Monad,
+        Xast.SemAnalyzer.Query,
+        Xast.SemAnalyzer.Types,        
+
+        Xast.Utils.List,
+        Xast.Utils.Pretty,
 
     build-depends:    
         mtl ^>=2.3.1,
