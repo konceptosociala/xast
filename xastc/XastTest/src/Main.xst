@@ -1,8 +1,5 @@
 module Main exports { UpdatePlayerPosition }
 
-use Sas *
-use Sas {x, Y}
-
 use Utils.Components {a, B, CC, xyZ}
 use Utils.Components {c, B, B, D, CC, xyZ}
 

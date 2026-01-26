@@ -9,57 +9,18 @@ import Error.Diagnose
 import Error.Diagnose.Compat.Megaparsec (HasHints (hints), errorDiagnosticFromBundle)
 import Text.Megaparsec
 
+import Xast.Parser.Extern (externFunc, externType, extern)
 import Xast.Error.Types
 import Xast.AST
 import Xast.Utils.Pretty
+import Xast.Parser.Common (Parser)
+
+x :: Parser Extern
+x = extern
 
 instance HasHints Void String where
    hints :: Void -> [Note String]
    hints _ = []
-
-printWarnings :: [SemWarning] -> IO ()
-printWarnings warns = forM_ warns printWarning
-
-printWarning :: SemWarning -> IO ()
-printWarning (SWRedundantImport intr) = case intr of
-   InterModule (Located (Location pos _ len) module_) -> do
-      let filename = sourceName pos
-      file <- readFile filename
-
-      let report =
-            Warn
-            Nothing
-            ("Redundant module import: " <> show (yellow (bold (show module_))))
-            [ (toPosition pos len filename, Where "Module is imported here")
-            ]
-            []
-
-      let diagnostic = addFile mempty filename file
-      printDiagnostic stdout WithUnicode (TabSize 4) defaultStyle $ addReport diagnostic report
-
-   InterSelect module_ xs -> unless (null xs) $ do
-      let dat = flip map xs $
-            \(Located loc ident) ->
-               let Location pos _ len = loc
-                   filename = sourceName pos
-               in (ident, (toPosition pos len filename, Where "remove this import"))
-
-      let filename = (sourceName . lPos . lLocation . head) xs
-      file <- readFile filename
-
-      let report =
-            Warn
-            Nothing
-            ( "Redundant imports in module " <> show (yellow (bold (show module_))) <> ": "
-               <> intercalate ", " (map (show . fst) dat)
-            )
-            (map snd dat)
-            []
-
-      let diagnostic = addFile mempty filename file
-      printDiagnostic stdout WithUnicode (TabSize 4) defaultStyle $ addReport diagnostic report
-
-printWarning _ = undefined
 
 class PrintError a where
    printError :: a -> IO ()
@@ -91,44 +52,107 @@ instance PrintError (ParseErrorBundle Text Void) where
 
 instance PrintError SemError where
    printError :: SemError -> IO ()
-   printError (SESelfImportError module_ from to) = do
+   printError (SESelfImportError module_ from to) =
       let Location fromPos _ fromLen = from
           Location toPos _ toLen = to
           filename = sourceName fromPos
-
-      file <- readFile filename
-
-      let report =
-            Err
-            Nothing
+          report = errReport
             ("Found self-referencing import in module: " <> show (red (bold (show module_))))
             [ (toPosition fromPos fromLen filename, Where "Module is defined here")
             , (toPosition toPos toLen filename, This "Module imports itself here")
             ]
-            [Note "A module cannot import itself. Remove this import statement."]
+            [Hint "A module cannot import itself. Remove this import statement."]
 
-      let diagnostic = addFile mempty filename file
-      printDiagnostic stdout WithUnicode (TabSize 4) defaultStyle $ addReport diagnostic report
+      in printReportAt filename report
 
-   printError (SECyclicImportError modules loc) = do
+   printError (SECyclicImportError modules loc) =
       let Location pos _ len = loc
-      let filename = sourceName pos
-      let cycleT = intercalate " ─▶ " (map show modules)
-
-      file <- readFile filename
-
-      let report =
-            Err
-            Nothing
+          filename = sourceName pos
+          cycleT = intercalate " ─▶ " (map show modules)
+          report = errReport
             ("Found cyclical import: " <> show (red (bold cycleT)))
-            [ (toPosition pos len filename, Where "Module is defined here")
+            [ (toPosition pos len filename, Where "Module is defined here") ]
+            []
+
+     in printReportAt filename report
+
+   printError (SEMissingImport module_ loc) =
+      let Location pos _ len = loc
+          filename = sourceName pos
+          report = errReport
+            ("Trying to import a missing module: " <> show (red (bold (show module_))))
+            [ (toPosition pos len filename, This "Imported module does not exist") ]
+            []
+
+      in printReportAt filename report
+
+   printError (SEInvalidExport module_ loc ids) =
+      let Location pos _ len = loc
+          filename = sourceName pos
+          report = errReport
+            ( "Invalid exported symbols in module " <> show (red (bold (show module_))) <> ": " 
+               <> intercalate ", " (map show ids)
+            )
+            [(toPosition pos len filename, This "This export is invalid")]
+            []
+
+      in printReportAt filename report
+
+   printError unimplemented = error $ "Unimplemented SA Error: " ++ show unimplemented
+
+printWarnings :: [SemWarning] -> IO ()
+printWarnings warns = forM_ warns printWarning
+
+printWarning :: SemWarning -> IO ()
+printWarning (SWRedundantImport intr) = case intr of
+   InterModule (Located (Location pos _ len) module_) ->
+      let filename = sourceName pos
+          report = warnReport
+            ("Redundant module import: " <> show (yellow (bold (show module_))))
+            [ (toPosition pos len filename, Where "Module is imported here")
             ]
             []
 
-      let diagnostic = addFile mempty filename file
-      printDiagnostic stdout WithUnicode (TabSize 4) defaultStyle $ addReport diagnostic report
+      in printReportAt filename report
 
-   printError unimplemented = error $ "Unimplemented SA Error: " ++ show unimplemented
+   InterSelect module_ xs -> unless (null xs) $
+      let dat = flip map xs $
+            \(Located loc ident) ->
+               let Location pos _ len = loc
+                   fname = sourceName pos
+               in (ident, (toPosition pos len fname, Blank))
+          filename = (sourceName . lPos . lLocation . head) xs
+          report =
+            Warn
+            Nothing
+            ( "Redundant imports in module " <> show (yellow (bold (show module_))) <> ": "
+               <> intercalate ", " (map (show . fst) dat)
+            )
+            (map snd dat)
+            [ Hint $ "Remove redundant imports: "
+               <> mark q
+               <> intercalate (mark q <> ", " <> mark q) (map (mark . show . fst) dat)
+               <> mark q
+            ]
+            where
+               mark = show . yellow
+               q = "\""
+
+      in printReportAt filename report
+
+printWarning _ = undefined
+
+errReport :: String -> [(Position, Marker String)] -> [Note String] -> Report String
+errReport = Err Nothing
+
+warnReport :: String -> [(Position, Marker String)] -> [Note String] -> Report String
+warnReport = Warn Nothing
+
+printReportAt :: FilePath -> Report String -> IO ()
+printReportAt filename report = do
+   file <- readFile filename
+   let diagnostic = addFile mempty filename file
+   printDiagnostic stdout WithUnicode (TabSize 4) defaultStyle $ addReport diagnostic report
 
 toPosition :: SourcePos -> Int -> FilePath -> Position
 toPosition (SourcePos _ line col) len filename =

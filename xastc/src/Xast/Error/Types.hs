@@ -11,14 +11,18 @@ data SemInfo
    | SemError SemError
 
 data SemError
+   -- Import error
    = SESelfImportError Module Location Location
    | SECyclicImportError [Module] Location
+   | SEMissingImport Module Location
+   | SEInvalidExport Module Location [Ident]
+   -- Redeclaration error
    | SETypeRedeclaration Ident Location Location
    | SEFnRedeclaration Ident Location Location
    | SEExternFnRedeclaration Ident Location Location
    | SEExternTypeRedeclaration Ident Location Location
    | SESystemRedeclaration Ident Location Location
-   | SEModuleRedeclaration [Ident]
+   -- 
    | SEUndefinedVar Ident
    deriving Show
 

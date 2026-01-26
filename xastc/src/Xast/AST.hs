@@ -159,7 +159,7 @@ instance Show Module where
 
 data ModuleDef = ModuleDef
    { mdName :: Module
-   , mdExport :: ExportPayload
+   , mdExport :: Located ExportPayload
    }
    deriving (Eq, Show)
 

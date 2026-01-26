@@ -1,8 +1,4 @@
-module Utils.Garbage exports { Tree, Node, myFunction }
-
-use My.Module1 as M
-use My.Module2 {imp1, Imp2}
-use My.Module3 *
+module Utils.Garbage exports { Tree, myFunction }
 
 type Tree a 
    = Node {

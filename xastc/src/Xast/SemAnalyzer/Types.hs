@@ -15,6 +15,15 @@ data Env = Env
 emptyEnv :: Env
 emptyEnv = Env M.empty M.empty M.empty
 
+data SymTable = SymTable
+   { modules :: M.Map Module ModuleInfo
+   , currentModule :: Module
+   }
+   deriving (Eq, Show)
+
+emptySymTable :: SymTable
+emptySymTable = SymTable M.empty (Module [])
+
 data QualifiedName = QualifiedName Module Ident
    deriving (Eq, Show, Ord)
 
@@ -42,15 +51,6 @@ symbolLoc = \case
    SymbolSystem (Located loc _)     -> loc
    SymbolExternFn (Located loc _)   -> loc
    SymbolExternType (Located loc _) -> loc
-
-data SymTable = SymTable
-   { modules :: M.Map Module ModuleInfo
-   , currentModule :: Module
-   }
-   deriving (Eq, Show)
-
-emptySymTable :: SymTable
-emptySymTable = SymTable M.empty (Module [])
 
 data SystemSig = SystemSig
    { sysArgs :: [Type]

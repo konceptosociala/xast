@@ -16,7 +16,7 @@ moduleDef = located $ do
    _        <- symbol "module"
    mdName   <- module'
    _        <- symbol "exports"
-   mdExport <- exportPayload
+   mdExport <- located exportPayload
 
    return ModuleDef {..}
 
