@@ -9,14 +9,9 @@ import Error.Diagnose
 import Error.Diagnose.Compat.Megaparsec (HasHints (hints), errorDiagnosticFromBundle)
 import Text.Megaparsec
 
-import Xast.Parser.Extern (externFunc, externType, extern)
 import Xast.Error.Types
 import Xast.AST
-import Xast.Utils.Pretty
-import Xast.Parser.Common (Parser)
-
-x :: Parser Extern
-x = extern
+import Xast.Utils.Pretty 
 
 instance HasHints Void String where
    hints :: Void -> [Note String]
@@ -57,7 +52,7 @@ instance PrintError SemError where
           Location toPos _ toLen = to
           filename = sourceName fromPos
           report = errReport
-            ("Found self-referencing import in module: " <> show (red (bold (show module_))))
+            ("Found self-referencing import in module: " <> highlightModule module_)
             [ (toPosition fromPos fromLen filename, Where "Module is defined here")
             , (toPosition toPos toLen filename, This "Module imports itself here")
             ]
@@ -68,19 +63,19 @@ instance PrintError SemError where
    printError (SECyclicImportError modules loc) =
       let Location pos _ len = loc
           filename = sourceName pos
-          cycleT = intercalate " ─▶ " (map show modules)
+          cycleT = show $ red $ bold $ intercalate " ─▶ " (map show modules)
           report = errReport
-            ("Found cyclical import: " <> show (red (bold cycleT)))
+            ("Found cyclical import: " <> cycleT)
             [ (toPosition pos len filename, Where "Module is defined here") ]
             []
 
      in printReportAt filename report
 
-   printError (SEMissingImport module_ loc) =
+   printError (SEMissingModule module_ loc) =
       let Location pos _ len = loc
           filename = sourceName pos
           report = errReport
-            ("Trying to import a missing module: " <> show (red (bold (show module_))))
+            ("Trying to import a missing module: " <> highlightModule module_)
             [ (toPosition pos len filename, This "Imported module does not exist") ]
             []
 
@@ -90,11 +85,75 @@ instance PrintError SemError where
       let Location pos _ len = loc
           filename = sourceName pos
           report = errReport
-            ( "Invalid exported symbols in module " <> show (red (bold (show module_))) <> ": " 
-               <> intercalate ", " (map show ids)
+            ( "Invalid exported symbols in module " <> highlightModule module_ <> ": " 
+               <> show (green (intercalate ", " (map show ids)))
             )
             [(toPosition pos len filename, This "This export is invalid")]
             []
+
+      in printReportAt filename report
+
+   printError (SEMissingImports module_ loc ids) =
+      let Location pos _ len = loc
+          filename = sourceName pos
+          report = errReport
+            ( "Imported symbols are not found in module " <> highlightModule module_ <> ": " 
+               <> intercalate ", " (map show ids)
+            )
+            [(toPosition pos len filename, This "This import contains missing symbols")]
+            []
+
+      in printReportAt filename report
+
+   printError (SEPrivateImports module_ loc ids) =
+      let Location pos _ len = loc
+          filename = sourceName pos
+          imports = intercalate ", " (map show ids)
+          report = errReport
+            ( "Imported symbols in module " <> highlightModule module_ <> " are private: " 
+               <> imports
+            )
+            [(toPosition pos len filename, This "This import contains private symbols")]
+            [Hint ("Add " <> imports <> " to the list of exported symbols of module " <> show (blue (bold (show module_))))]
+
+      in printReportAt filename report
+
+   printError (SEAmbiguousAlias alias locA locB) =
+      let Location posA _ lenA = locA
+          Location posB _ lenB = locB
+          filename = sourceName posA
+          report = errReport
+            ("Ambiguous module import aliases found: " <> show (blue (show alias)))
+            [ (toPosition posA lenA filename, Where "First module alias imported here")
+            , (toPosition posB lenB filename, Where "Second module alias imported here")
+            ]
+            []
+
+      in printReportAt filename report
+
+   printError (SEAmbiguousImport ident locA locB) =
+      let Location posA _ lenA = locA
+          Location posB _ lenB = locB
+          filename = sourceName posA
+          report = errReport
+            ("Ambiguous unqualified import: " <> show (blue (show ident)))
+            [ (toPosition posA lenA filename, Where "First import of this symbol")
+            , (toPosition posB lenB filename, Where "Second import of this symbol")
+            ]
+            [ Hint "Use module qualification to disambiguate" ]
+
+      in printReportAt filename report
+
+   printError (SEImportDeclConflict ident impLoc declLoc) =
+      let Location posImp _ lenImp = impLoc
+          Location posDecl _ lenDecl = declLoc
+          filename = sourceName posImp
+          report = errReport
+            ("Imported name conflicts with local declaration: " <> show (blue (show ident)))
+            [ (toPosition posImp lenImp filename, Where "Symbol imported here")
+            , (toPosition posDecl lenDecl filename, Where "Symbol declared locally here")
+            ]
+            [ Hint "Rename the local declaration or use qualified imports" ]
 
       in printReportAt filename report
 
@@ -108,7 +167,7 @@ printWarning (SWRedundantImport intr) = case intr of
    InterModule (Located (Location pos _ len) module_) ->
       let filename = sourceName pos
           report = warnReport
-            ("Redundant module import: " <> show (yellow (bold (show module_))))
+            ("Redundant module import: " <> highlightModule module_)
             [ (toPosition pos len filename, Where "Module is imported here")
             ]
             []
@@ -125,7 +184,7 @@ printWarning (SWRedundantImport intr) = case intr of
           report =
             Warn
             Nothing
-            ( "Redundant imports in module " <> show (yellow (bold (show module_))) <> ": "
+            ( "Redundant imports in module " <> highlightModule module_ <> ": "
                <> intercalate ", " (map (show . fst) dat)
             )
             (map snd dat)
@@ -141,6 +200,9 @@ printWarning (SWRedundantImport intr) = case intr of
       in printReportAt filename report
 
 printWarning _ = undefined
+
+highlightModule :: Module -> String
+highlightModule = show . blue . show
 
 errReport :: String -> [(Position, Marker String)] -> [Note String] -> Report String
 errReport = Err Nothing

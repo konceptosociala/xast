@@ -9,7 +9,7 @@ import Xast.SemAnalyzer.Types
 import Xast.Error.Types
 
 type SemAnalyzer = 
-   WriterT [SemInfo]
+   WriterT [SemReport]
       ( ReaderT Env 
          ( StateT 
             SymTable 
@@ -21,7 +21,7 @@ runSemAnalyzer
    :: Env 
    -> SymTable 
    -> SemAnalyzer a 
-   -> Identity ((a, [SemInfo]), SymTable)
+   -> Identity ((a, [SemReport]), SymTable)
 runSemAnalyzer env symTable analyzer =
    runStateT (runReaderT (runWriterT analyzer) env) symTable
 

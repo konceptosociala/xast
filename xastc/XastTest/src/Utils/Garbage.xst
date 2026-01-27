@@ -1,4 +1,4 @@
-module Utils.Garbage exports { Tree, myFunction }
+module Utils.Garbage exports { Tree, myFunction, Pos }
 
 type Tree a 
    = Node {
@@ -6,6 +6,8 @@ type Tree a
       right : Maybe (Tree a) 
    } 
    | Leaf a;
+
+type Pos = Pos;
 
 type Rec = Rec {
    fieldOne : Int,

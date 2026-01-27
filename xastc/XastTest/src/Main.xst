@@ -1,7 +1,6 @@
 module Main exports { UpdatePlayerPosition }
 
-use Utils.Components {a, B, CC, xyZ}
-use Utils.Components {c, B, B, D, CC, xyZ}
+use Utils.Components *
 
 system UpdatePlayerPosition #(Player, Pos, Velocity) 
     -> (Pos, List Effect);

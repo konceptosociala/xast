@@ -17,6 +17,9 @@ data Location = Location
    }
    deriving (Eq, Show, Ord)
 
+sortLocByPos :: Location -> Location -> Ordering
+sortLocByPos locA locB = compare (lPos locA) (lPos locB)
+
 data Mode
    = MStrict
    | MSafe
