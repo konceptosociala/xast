@@ -183,7 +183,7 @@ binOp opLoc op a@(Located (Location posA offA _) _) b@(Located (Location _ offB 
 
 table :: [[Operator Parser (Located (Expr Parsed))]]
 table =
-   [  [ Prefix (unary OpNot)
+   [  [ Prefix (unaryDirect OpNot)
       , Prefix (unary OpNeg)
       ]
 
@@ -224,6 +224,17 @@ unary op = do
    _ <- symbol (opToken op)
    let opLoc = Location pos off (opLen op)
    pure $ \x -> binOp opLoc op (Located opLoc (ExpLit ParsedInfo (LitInt 0))) x
+
+unaryDirect :: BuiltinOp -> Parser (Located (Expr Parsed) -> Located (Expr Parsed))
+unaryDirect op = do
+   pos <- getSourcePos
+   off <- getOffset
+   _ <- symbol (opToken op)
+   let opLoc = Location pos off (opLen op)
+   pure $ \x@(Located (Location _ offX lenX) _) ->
+      Located
+         (Location pos off ((offX + lenX) - off))
+         (ExpApp ParsedInfo (Located opLoc (opVar op)) x)
 
 expr :: Parser (Located (Expr Parsed))
 expr = makeExprParser term table

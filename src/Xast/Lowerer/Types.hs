@@ -1,59 +1,52 @@
 module Xast.Lowerer.Types where
 
-import qualified Data.Map as M
-import Xast.AST (Ident, Type, Literal)
+import Xast.AST (Type, Literal)
 import Data.Text (Text)
 
-data LowerState = LowerState
-   { lowerNameSupply :: Int
-   , lowerLifted     :: [IrFunc]
-   , lowerMonoCache  :: M.Map (Ident, [Type]) IrName
+data LowerState = LowerState {}
+
+-- KIRA = Khast Intermediate RepresentAtion
+data Kira = Kira
+   { kirSystems :: [KirSystem]
+   , kirFns :: () -- TODO: add pure functions
    }
 
-data IrModule = IrModule
-   { irFuncs   :: [IrFunc]
-   , irTypes   :: [IrTypeDef]
-   , irSystems :: [IrSystem]
+newtype KirName = KirName Text
+
+data KirSystem = KirSystem
+   { kirSysName :: KirName
+   , kirSysBindings :: [KirBinding]
+   , kirSysBody :: KirBlock
    }
 
-newtype IrName = IrName Text
-   deriving (Eq, Ord, Show)
-
-data IrFunc = IrFunc
-   { irFnName   :: IrName
-   , irFnParams :: [(IrName, Type)]
-   , irFnRet    :: Type
-   , irFnBody   :: IrBlock
+data KirBlock = KirBlock
+   { kirInstructs :: [KirInstruct]
+   , kirTerm :: KirTerm
    }
 
-data IrBlock = IrBlock [IrInst] IrTerm
+data KirInstruct
+   = KirCall KirName [KirValue] KirName
+   | KirAssign KirBindingId KirValue
 
-data IrInst = IrLet IrName Type IrRhs
+data KirTerm
+   = KirReturn
 
-data IrRhs
-   = IrLit Literal
-   | IrVar IrName                          -- atom reference
-   | IrCall IrName [IrName]                -- direct call, incl. extern fns (opAdd, etc.)
-   | IrCallClosure IrName [IrName]         -- call through a closure value
-   | IrMakeClosure IrName [IrName]         -- lifted fn name, captured var names
-   | IrCtor Ident Int [IrName]             -- ctor name, tag index, field values
-   | IrTuple [IrName]
-   | IrFieldGet IrName Int                 -- tuple/record field access by index
-   | IrTagOf IrName                        -- extract the discriminant tag for a switch
+data KirValue
+   = KirConst Literal
+   | KirVar KirName
 
-data IrTerm
-   = IrReturn IrName
-   | IrSwitch IrName [(Int, IrBlock)] (Maybe IrBlock)
-   | IrJump IrBlock
+newtype KirBindingId = KirBindingId Int
 
-data IrTypeDef = IrTypeDef
-   { irTdName  :: Ident
-   , irTdCtors :: [(Ident, [Type])]
+data KirBinding = KirBinding
+   { kirBindType    :: Type
+   , kirBindSrc     :: KirBindingSrc
+   , kirBindAccess  :: KirBindingAccess
    }
 
-data IrSystem = IrSystem
-   { irSysName    :: IrName
-   , irSysQueried :: [[Type]]
-   , irSysWith    :: [Type]
-   , irSysBody    :: IrBlock
-   }
+data KirBindingAccess
+   = AccessRead
+   | AccessWrite
+
+data KirBindingSrc
+   = SrcEntity
+   | SrcSingleton

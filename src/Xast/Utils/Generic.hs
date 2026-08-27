@@ -5,6 +5,8 @@ module Xast.Utils.Generic where
 (<--) :: Functor m => m (a -> b) -> a -> m b
 f <-- a = fmap (\fm -> fm a) f
 
+infixl 3 <--
+
 unreachable :: a
 unreachable = error "Entered unreachable state!"
 

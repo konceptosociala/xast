@@ -657,7 +657,7 @@ resolveExpr scope imps (Located loc expr) = case expr of
 typeCheck :: Program Resolved -> SemAnalyzer (Program Typed)
 typeCheck (Program mdl@(Located _ (ModuleDef m _)) imps stmts src) = do
    modify $ \st -> st { currentModule = m }
-   (Program mdl imps <$> traverse (typeCheckStmt imps) stmts) <-- src
+   Program mdl imps <$> traverse (typeCheckStmt imps) stmts <-- src
 
 typeCheckStmt :: [Located ImportDef] -> Stmt Resolved -> SemAnalyzer (Stmt Typed)
 typeCheckStmt imps (StmtFunc (FnImpl (Located implLoc (FuncImpl fnIdent pats expr)))) = do
