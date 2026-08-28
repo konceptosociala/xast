@@ -669,7 +669,7 @@ exprTests = TestLabel "Expr (atoms)" $ TestList
          loc $
             ExpLambda ParsedInfo $
                Lambda
-                  [Ident "x"]
+                  [PatVar (Ident "x")]
                   (loc $ ExpVar ParsedInfo Nothing (Ident "x"))
 
    , TestCase $
@@ -677,7 +677,7 @@ exprTests = TestLabel "Expr (atoms)" $ TestList
          loc $
             ExpLambda ParsedInfo $
                Lambda
-                  [Ident "x", Ident "y"]
+                  [PatVar (Ident "x"), PatVar (Ident "y")]
                   (loc $ ExpVar ParsedInfo Nothing (Ident "x"))
 
    , TestCase $
@@ -685,8 +685,24 @@ exprTests = TestLabel "Expr (atoms)" $ TestList
          loc $
             ExpLambda ParsedInfo $
                Lambda
-                  [Ident "a", Ident "b", Ident "c"]
+                  [PatVar (Ident "a"), PatVar (Ident "b"), PatVar (Ident "c")]
                   (loc $ ExpVar ParsedInfo Nothing (Ident "c"))
+
+   , TestCase $
+      assertParses expr ".\\(x, y) -> x" $
+         loc $
+            ExpLambda ParsedInfo $
+               Lambda
+                  [PatTuple [PatVar (Ident "x"), PatVar (Ident "y")]]
+                  (loc $ ExpVar ParsedInfo Nothing (Ident "x"))
+
+   , TestCase $
+      assertParses expr ".\\MyStruct a b -> a" $
+         loc $
+            ExpLambda ParsedInfo $
+               Lambda
+                  [PatCon (Ident "MyStruct") [PatVar (Ident "a"), PatVar (Ident "b")]]
+                  (loc $ ExpVar ParsedInfo Nothing (Ident "a"))
 
    -- If
    , TestCase $

@@ -5,12 +5,12 @@ module Xast.Parser.Expr where
 import Control.Monad.Combinators.Expr
 import Data.Text (Text, pack)
 import Data.List (foldl', foldl1')
-import Text.Megaparsec.Char (char)
+import Text.Megaparsec.Char (char, string)
 import Text.Megaparsec
 import qualified Text.Megaparsec.Char.Lexer as L
 
 import Xast.AST
-import Xast.Parser.Ident (varIdent, typeIdent, inferIdent)
+import Xast.Parser.Ident (varIdent, typeIdent)
 import Xast.Parser.Common (Parser, lexeme, symbol, located)
 
 pattern' :: Parser Pattern
@@ -51,7 +51,7 @@ atomExpr = do
       , ExpIfThen ParsedInfo <$> ifThenElse
       , ExpMatch ParsedInfo  <$> match'
       ]
-   getters <- many (located (symbol "." *> varGetter))
+   getters <- many (located (try (symbol "." *> varGetter)))
    let based = foldl' applyGetter base getters
    updates <- many (located recUpdateBlock)
    pure $ foldl' applyRecUpdate based updates
@@ -123,10 +123,15 @@ opIdent op = case op of
    OpPow     -> Ident "opPow"
    OpEq      -> Ident "opEq"
    OpNeq     -> Ident "opNeq"
+   OpLt      -> Ident "opLt"
+   OpGt      -> Ident "opGt"
+   OpLe      -> Ident "opLe"
+   OpGe      -> Ident "opGe"
    OpAnd     -> Ident "opAnd"
    OpOr      -> Ident "opOr"
    OpNot     -> Ident "opNot"
    OpPipe    -> Ident "opPipe"
+   OpApply   -> Ident "opApply"
    OpConcat  -> Ident "opConcat"
    OpNeg     -> Ident "opNeg"
 
@@ -144,10 +149,15 @@ opToken op = case op of
    OpPow     -> "**"
    OpEq      -> "=="
    OpNeq     -> "!="
+   OpLt      -> "<"
+   OpGt      -> ">"
+   OpLe      -> "<="
+   OpGe      -> ">="
    OpAnd     -> "&&"
    OpOr      -> "||"
    OpNot     -> "!"
    OpPipe    -> "|>"
+   OpApply   -> "<|"
    OpConcat  -> "<>"
 
 opLen :: BuiltinOp -> Int
@@ -161,10 +171,15 @@ opLen op = case op of
    OpPow     -> 2
    OpEq      -> 2
    OpNeq     -> 2
+   OpLt      -> 1
+   OpGt      -> 1
+   OpLe      -> 2
+   OpGe      -> 2
    OpAnd     -> 2
    OpOr      -> 2
    OpNot     -> 1
    OpPipe    -> 2
+   OpApply   -> 2
    OpConcat  -> 2
 
 binOp :: Location -> BuiltinOp -> Located (Expr Parsed) -> Located (Expr Parsed) -> Located (Expr Parsed)
@@ -200,6 +215,10 @@ table =
 
    ,  [ InfixN (binary OpEq)
       , InfixN (binary OpNeq)
+      , InfixN (binary OpLe)
+      , InfixN (binary OpGe)
+      , InfixN (binaryGuarded OpLt "=|>")
+      , InfixN (binaryGuarded OpGt "=")
       ]
 
    ,  [ InfixR (binary OpAnd) ]
@@ -207,6 +226,8 @@ table =
 
    ,  [ InfixL (binary OpPipe) ]
    ,  [ InfixL (binary OpConcat) ]
+
+   ,  [ InfixR applyLeft ]
    ]
 
 binary :: BuiltinOp -> Parser (Located (Expr Parsed) -> Located (Expr Parsed) -> Located (Expr Parsed))
@@ -214,6 +235,25 @@ binary op = do
    pos <- getSourcePos
    off <- getOffset
    _ <- symbol (opToken op)
+   let opLoc = Location pos off (opLen op)
+   pure (binOp opLoc op)
+
+applyLeft :: Parser (Located (Expr Parsed) -> Located (Expr Parsed) -> Located (Expr Parsed))
+applyLeft = do
+   _ <- symbol (opToken OpApply)
+   pure $ \f@(Located (Location posF offF _) _) x@(Located (Location _ offX lenX) _) ->
+      Located
+         (Location posF offF ((offX + lenX) - offF))
+         (ExpApp ParsedInfo f x)
+
+-- | Like `binary`, but the token must not be immediately followed by any of
+-- `forbidden` — used to keep `<`/`>` from swallowing the first char of a
+-- longer operator that shares their prefix (`<=`, `<|`, `<>`, `>=`).
+binaryGuarded :: BuiltinOp -> [Char] -> Parser (Located (Expr Parsed) -> Located (Expr Parsed) -> Located (Expr Parsed))
+binaryGuarded op forbidden = do
+   pos <- getSourcePos
+   off <- getOffset
+   _ <- lexeme (try (string (opToken op) <* notFollowedBy (satisfy (`elem` forbidden))))
    let opLoc = Location pos off (opLen op)
    pure (binOp opLoc op)
 
@@ -253,7 +293,7 @@ ifThenElse = do
 lambda :: Parser (Lambda Parsed)
 lambda = do
    _        <- symbol ".\\"
-   lamArgs  <- some (varIdent <|> inferIdent)
+   lamArgs  <- some pattern'
    _        <- symbol "->"
    lamBody  <- expr
 

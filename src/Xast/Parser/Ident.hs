@@ -20,8 +20,9 @@ builtin :: [Text]
 builtin =
    -- Functions
    [ "opAdd", "opSub", "opMul", "opDiv", "opMod"
-   , "opPow", "opEq", "opNeq", "opAnd", "opOr"
-   , "opPipe", "opConcat"
+   , "opPow", "opEq", "opNeq", "opLt", "opGt"
+   , "opLe", "opGe", "opAnd", "opOr"
+   , "opPipe", "opApply", "opConcat"
    ]
 
 genericIdent :: Parser Ident

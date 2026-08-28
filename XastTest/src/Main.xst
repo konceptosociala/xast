@@ -14,6 +14,22 @@ module Main exports {
 use Utils.Components *
 use Utils.Renderer *
 
+type LoopResult s r
+    = Done r
+    | Continue s;
+
+extern fn loop(s, fn(s) -> LoopResult s r) -> r;
+
+fn loopTest() -> List Int;
+fn loopTest =
+    loop (0, []) .\ (x, result) ->
+        if x >= 10 then
+            Done result
+        else
+            Continue (x + 1, [x] <> result);
+
+extern fn opGe(Int, Int) -> Bool;
+extern fn opConcat(List a, List a) -> List a;
 extern fn opAdd(Int, Int) -> Int;
 extern fn opMul(Int, Int) -> Int;
 extern fn opEq(Int, Int) -> Bool;

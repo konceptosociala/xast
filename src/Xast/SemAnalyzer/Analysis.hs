@@ -4,6 +4,7 @@ module Xast.SemAnalyzer.Analysis where
 
 import Control.Monad.Except (ExceptT(..))
 import Control.Monad.State
+import Control.Monad.Writer (listen, censor)
 import Control.Monad (forM_, unless, when, foldM, zipWithM_, zipWithM, forM)
 import Data.Maybe (mapMaybe, fromJust, fromMaybe)
 import Data.List (sortBy, intersperse)
@@ -602,7 +603,7 @@ resolveExpr scope imps (Located loc expr) = case expr of
    ExpLit _ lit -> pure $ ExpLit (ResolvedInfo Nothing) lit
 
    ExpLambda _ (Lambda args body) -> do
-      argScope <- freshLocalScope (S.fromList args)
+      argScope <- freshLocalScope (foldMap collectPatternVars args)
       body' <- resolveExprAt (M.union argScope scope) imps body
       pure $ ExpLambda (ResolvedInfo Nothing) (Lambda args body')
 
@@ -986,8 +987,7 @@ inferType imps (Located loc expr) = case expr of
 
    ExpLambda (ResolvedInfo mRes) (Lambda args body) -> do
       argTyVars <- forM args $ const freshTyVar
-      varIds    <- forM args $ const freshVarId
-      let argVars = M.fromList $ zip args (zipWith VarInfo argTyVars varIds)
+      argVars   <- M.unions <$> zipWithM (inferPattern imps loc) argTyVars args
 
       body' <- withVars argVars (inferType imps body)
 
@@ -1189,19 +1189,31 @@ applyTypes loc applicantTy operandTy = do
          errSem (SENotAFunction loc applicantTy')
          pure TyInvalid
 
+-- | Unify `expected` with `current`, binding any unresolved type variables
+-- on either side. `unify` reports its own (generic) `SETypeError` on
+-- mismatch, so its output is suppressed here in favor of a plain type-error
+-- message with a stable (expected, current) type ordering.
 compareTypes :: Location -> Type -> Type -> SemAnalyzer ()
 compareTypes loc expected current = do
-   expected' <- resolve expected
-   current' <- resolve current
-   unless (current' == expected') $
+   ((), reports) <- censor (const []) $ listen (unify loc expected current)
+   when (any isSemError reports) $ do
+      expected' <- resolve expected
+      current' <- resolve current
       errSem (SETypeError loc expected' current')
 
+-- | Like `compareTypes`, but unifies the two branch types and reports a
+-- `then`/`else`-specific mismatch instead of a generic type error.
 compareThenElse :: Location -> Type -> Location -> Type -> SemAnalyzer ()
 compareThenElse thenLoc thenType elseLoc elseType = do
-   thenType' <- resolve thenType
-   elseType' <- resolve elseType
-   unless (thenType' == elseType') $
+   ((), reports) <- censor (const []) $ listen (unify thenLoc thenType elseType)
+   when (any isSemError reports) $ do
+      thenType' <- resolve thenType
+      elseType' <- resolve elseType
       errSem (SEThenElseTypeMismatch thenLoc thenType' elseLoc elseType')
+
+isSemError :: SemReport -> Bool
+isSemError (SemError _) = True
+isSemError _            = False
 
 literalType :: Literal -> SemAnalyzer Type
 literalType (LitString _) = pure $ TyCon (Ident "String")

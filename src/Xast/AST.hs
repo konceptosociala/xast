@@ -208,10 +208,15 @@ data BuiltinOp
    -- Logical
    | OpEq      -- ==
    | OpNeq     -- !=
+   | OpLt      -- <
+   | OpGt      -- >
+   | OpLe      -- <=
+   | OpGe      -- >=
    | OpAnd     -- &&
    | OpOr      -- ||
    | OpNot     -- !
    | OpPipe    -- |>
+   | OpApply   -- <|
    | OpConcat  -- <>
    deriving (Eq, Show)
 
@@ -244,7 +249,7 @@ instance Functor IfThenElse where
    fmap f (IfThenElse iteIf iteThen iteElse) = IfThenElse (fmap (fmap f) iteIf) (fmap (fmap f) iteThen) (fmap (fmap f) iteElse)
 
 data Lambda a = Lambda
-   { lamArgs :: [Ident]
+   { lamArgs :: [Pattern]
    , lamBody :: Located (Expr a)
    }
    deriving (Eq, Show)
@@ -507,24 +512,23 @@ typename (TyGnr ident) = show ident
 typename (TyCon ident) = show ident
 typename (TyTuple xs) = "(" ++ intercalate ", " (map typename xs) ++ ")"
 typename (TyFn args ret) = "fn(" ++ intercalate ", " (map typename args) ++ ") -> " ++ typename ret 
-typename (TyApp applicant operand) = 
-   let applicantType = typename applicant
-       operandType = typename operand
-       applicantPretty = 
-         if isTyApp applicant then
-            "(" ++ applicantType ++ ")"
-         else 
-            applicantType
-       operandPretty = 
-         if isTyApp operand then
-            "(" ++ operandType ++ ")"
-         else 
-            operandType
-   in applicantPretty ++ " " ++ operandPretty
+typename (TyApp applicant operand) =
+   let (headTy, args) = tyAppSpine applicant operand
+   in unwords (typename headTy : map typenameArg args)
 typename (TyVar n) = "t" ++ show n
 typename TyInvalid = "<invalid>"
 
+tyAppSpine :: Type -> Type -> (Type, [Type])
+tyAppSpine (TyApp applicant' operand') operand =
+   let (headTy, args) = tyAppSpine applicant' operand'
+   in (headTy, args ++ [operand])
+tyAppSpine applicant operand = (applicant, [operand])
 
-isTyApp :: Type -> Bool
-isTyApp (TyApp _ _) = True
-isTyApp _ = False
+typenameArg :: Type -> String
+typenameArg ty
+   | needsParens ty = "(" ++ typename ty ++ ")"
+   | otherwise      = typename ty
+   where
+      needsParens (TyApp _ _) = True
+      needsParens (TyFn _ _)  = True
+      needsParens _           = False
