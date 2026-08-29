@@ -59,6 +59,12 @@ systemImpl = located $ do
 
    return SystemImpl {..}
 
-entityPattern :: Parser EntityPattern
+entityPattern :: Parser (EntityPattern Parsed)
 entityPattern = between (symbol "#(") (symbol ")") $
-   EntityPattern <$> some atomPattern'
+   EntityPattern <$> some entPatBinding
+
+-- | Access is unknown until a system's declared return type is available, so
+-- every pattern parses as `AccessRead` and gets its real access filled in
+-- during name resolution (see `resolveEntityPattern`).
+entPatBinding :: Parser (EntPatBinding Parsed)
+entPatBinding = (`EntPatBinding` AccessRead) <$> atomPattern'

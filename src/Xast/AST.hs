@@ -230,12 +230,12 @@ instance Functor Match where
    fmap :: (a -> b) -> Match a -> Match b
    fmap f (Match mtExp mtMatches) = Match (fmap (fmap f) mtExp) (fmap (fmap f) mtMatches)
 
-data MatchWing a = MatchWing (Located Pattern) (Located (Expr a))
+data MatchWing a = MatchWing (Located (Pattern a)) (Located (Expr a))
    deriving (Eq, Show)
 
 instance Functor MatchWing where
    fmap :: (a -> b) -> MatchWing a -> MatchWing b
-   fmap f (MatchWing pat expr) = MatchWing pat (fmap (fmap f) expr)
+   fmap f (MatchWing pat expr) = MatchWing (fmap (fmap f) pat) (fmap (fmap f) expr)
 
 data IfThenElse a = IfThenElse
    { iteIf :: Located (Expr a)
@@ -249,14 +249,14 @@ instance Functor IfThenElse where
    fmap f (IfThenElse iteIf iteThen iteElse) = IfThenElse (fmap (fmap f) iteIf) (fmap (fmap f) iteThen) (fmap (fmap f) iteElse)
 
 data Lambda a = Lambda
-   { lamArgs :: [Pattern]
+   { lamArgs :: [Located (Pattern a)]
    , lamBody :: Located (Expr a)
    }
    deriving (Eq, Show)
 
 instance Functor Lambda where
    fmap :: (a -> b) -> Lambda a -> Lambda b
-   fmap f (Lambda lamArgs lamBody) = Lambda lamArgs (fmap (fmap f) lamBody)
+   fmap f (Lambda lamArgs lamBody) = Lambda (fmap (fmap (fmap f)) lamArgs) (fmap (fmap f) lamBody)
 
 data LetIn a = LetIn
    { linBind :: [Located (Let a)]
@@ -269,14 +269,14 @@ instance Functor LetIn where
    fmap f (LetIn lamArgs lamBody) = LetIn (fmap (fmap (fmap f)) lamArgs) (fmap (fmap f) lamBody)
 
 data Let a = Let
-   { letPat :: Pattern
+   { letPat :: Located (Pattern a)
    , letValue :: Located (Expr a)
    }
    deriving (Eq, Show)
 
 instance Functor Let where
    fmap :: (a -> b) -> Let a -> Let b
-   fmap f (Let letPat letValue) = Let letPat (fmap (fmap f) letValue)
+   fmap f (Let letPat letValue) = Let (fmap (fmap f) letPat) (fmap (fmap f) letValue)
 
 data Literal
    = LitString Text
@@ -323,23 +323,56 @@ data FuncDef = FuncDef
 -- fn IDENT arg1 arg2 ... argN = <IMPL>
 data FuncImpl a = FuncImpl
    { fnName :: Ident
-   , fnArgs :: [Pattern]
+   , fnArgs :: [Located (Pattern a)]
    , fnBody :: Located (Expr a)
    }
    deriving (Eq, Show)
 
 instance Functor FuncImpl where
    fmap :: (a -> b) -> FuncImpl a -> FuncImpl b
-   fmap f (FuncImpl fnName fnArgs fnBody) = FuncImpl fnName fnArgs (fmap (fmap f) fnBody)
+   fmap f (FuncImpl fnName fnArgs fnBody) = FuncImpl fnName (fmap (fmap (fmap f)) fnArgs) (fmap (fmap f) fnBody)
 
-data Pattern
-   = PatVar Ident             -- a
-   | PatWildcard              -- _
-   | PatLit Literal           -- "abc"
-   | PatList [Pattern]        -- [a, 2, 3]
-   | PatTuple [Pattern]       -- (a, _, 12)
-   | PatCon Ident [Pattern]   -- Either a b
+data Pattern a
+   = PatVar a Ident                    -- a
+   | PatWildcard a                     -- _
+   | PatLit a Literal                  -- "abc"
+   | PatList a [Located (Pattern a)]   -- [a, 2, 3]
+   | PatTuple a [Located (Pattern a)]  -- (a, _, 12)
+   | PatCon a Ident [Located (Pattern a)] -- Either a b
    deriving (Eq, Show)
+
+patAnnotation :: Pattern a -> a
+patAnnotation = \case
+   PatVar a _ -> a
+   PatWildcard a -> a
+   PatLit a _ -> a
+   PatList a _ -> a
+   PatTuple a _ -> a
+   PatCon a _ _ -> a
+
+patType :: Pattern Typed -> Type
+patType = tyInfoType . patAnnotation 
+
+instance Functor Pattern where
+   fmap :: (a -> b) -> Pattern a -> Pattern b
+   fmap f = \case
+      PatVar a x ->
+         PatVar (f a) x
+
+      PatWildcard a ->
+         PatWildcard (f a)
+
+      PatLit a lit ->
+         PatLit (f a) lit
+
+      PatList a ps ->
+         PatList (f a) (fmap (fmap (fmap f)) ps)
+
+      PatTuple a ps ->
+         PatTuple (f a) (fmap (fmap (fmap f)) ps)
+
+      PatCon a ident ps ->
+         PatCon (f a) ident (fmap (fmap (fmap f)) ps)
 
 newtype Module = Module [Ident]
    deriving (Eq, Ord)
@@ -458,18 +491,38 @@ data WithType
 
 data SystemImpl a = SystemImpl
    { sysImName :: Ident
-   , sysImEnts :: [EntityPattern]
-   , sysImWith :: Maybe [Pattern]
+   , sysImEnts :: [EntityPattern a]
+   , sysImWith :: Maybe [Located (Pattern a)]
    , sysImBody :: Located (Expr a)
    }
    deriving (Eq, Show)
 
 instance Functor SystemImpl where
    fmap :: (a -> b) -> SystemImpl a -> SystemImpl b
-   fmap f (SystemImpl name ents with body) = SystemImpl name ents with (fmap (fmap f) body)
+   fmap f (SystemImpl name ents with body) =
+      SystemImpl name (fmap (fmap f) ents) (fmap (fmap (fmap (fmap f))) with) (fmap (fmap f) body)
 
-newtype EntityPattern = EntityPattern [Pattern]
+newtype EntityPattern a = EntityPattern [EntPatBinding a]
    deriving (Eq, Show)
+
+data EntPatBinding a = EntPatBinding
+   { entBindPat :: Located (Pattern a)
+   , entBindAccess :: BindingAccess
+   }
+   deriving (Eq, Show)
+
+instance Functor EntPatBinding where
+   fmap :: (a -> b) -> EntPatBinding a -> EntPatBinding b
+   fmap f (EntPatBinding pat acc) = EntPatBinding (fmap (fmap f) pat) acc
+
+data BindingAccess
+   = AccessRead
+   | AccessWrite
+   deriving (Eq, Show)
+
+instance Functor EntityPattern where
+   fmap :: (a -> b) -> EntityPattern a -> EntityPattern b
+   fmap f (EntityPattern ps) = EntityPattern (fmap (fmap f) ps)
 
 data TypeDef = TypeDef
    { tdMods       :: [Modifier]

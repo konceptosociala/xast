@@ -132,17 +132,18 @@ collectTokens (Located loc node) = case node of
    ExpList _ xs ->
       concatMap collectTokens xs
 
-   ExpLambda _ (Lambda _ lamBody) ->
-      collectTokens lamBody
+   ExpLambda _ (Lambda pats lamBody) ->
+      concatMap collectPatternTokens pats ++ collectTokens lamBody
 
    ExpApp _ f x ->
       collectTokens f ++ collectTokens x
 
    ExpLetIn _ (LetIn binds bodyExpr) ->
-      concatMap (collectTokens . letValue . lNode) binds ++ collectTokens bodyExpr
+      concatMap (\(Located _ (Let pat value)) -> collectPatternTokens pat ++ collectTokens value) binds
+         ++ collectTokens bodyExpr
 
    ExpMatch _ (Match scrut wings) ->
-      collectTokens scrut ++ concatMap (\(MatchWing _ e) -> collectTokens e) wings
+      collectTokens scrut ++ concatMap (\(MatchWing pat e) -> collectPatternTokens pat ++ collectTokens e) wings
 
    ExpIfThen _ (IfThenElse c t e) ->
       collectTokens c ++ collectTokens t ++ collectTokens e
@@ -156,19 +157,40 @@ collectTokens (Located loc node) = case node of
    ExpVarGetter _ e _ ->
       collectTokens e
 
+collectPatternTokens :: Located (Pattern Typed) -> [(Location, Type)]
+collectPatternTokens (Located loc node) = case node of
+   PatVar ty _ ->
+      [(loc, tyInfoType ty)]
+
+   PatWildcard ty ->
+      [(loc, tyInfoType ty)]
+
+   PatLit ty _ ->
+      [(loc, tyInfoType ty)]
+
+   PatList _ ps ->
+      concatMap collectPatternTokens ps
+
+   PatTuple _ ps ->
+      concatMap collectPatternTokens ps
+
+   PatCon _ _ ps ->
+      concatMap collectPatternTokens ps
+
 collectProgramTokens :: Program Typed -> [(Location, Type)]
 collectProgramTokens (Program _ _ stmts _) = concatMap collectStmtTokens stmts
 
 collectStmtTokens :: Stmt Typed -> [(Location, Type)]
 collectStmtTokens = \case
-   StmtFunc (FnImpl (Located _ (FuncImpl _ _ funcBody))) ->
-      collectTokens funcBody
+   StmtFunc (FnImpl (Located _ (FuncImpl _ pats funcBody))) ->
+      concatMap collectPatternTokens pats ++ collectTokens funcBody
 
-   StmtSystem (SysImpl (Located _ (SystemImpl _ _ _ sysBody))) ->
-      collectTokens sysBody
+   StmtSystem (SysImpl (Located _ (SystemImpl _ entPats mWith sysBody))) ->
+      concatMap (\(EntityPattern bindings) -> concatMap (collectPatternTokens . entBindPat) bindings) entPats
+         ++ maybe [] (concatMap collectPatternTokens) mWith
+         ++ collectTokens sysBody
 
-   _ ->
-      []
+   _ -> []
 
 renderSourceWithTokens :: Text -> [(Location, Type)] -> [Html]
 renderSourceWithTokens src tokens = go 0 (sortOn (lOffset . fst) tokens)

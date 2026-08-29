@@ -13,29 +13,29 @@ import Xast.AST
 import Xast.Parser.Ident (varIdent, typeIdent)
 import Xast.Parser.Common (Parser, lexeme, symbol, located)
 
-pattern' :: Parser Pattern
+pattern' :: Parser (Located (Pattern Parsed))
 pattern' = choice
-   [ try (PatCon <$> typeIdent <*> some atomPattern')
+   [ try (located (PatCon ParsedInfo <$> typeIdent <*> some atomPattern'))
    , atomPattern'
    ]
 
-atomPattern' :: Parser Pattern
+atomPattern' :: Parser (Located (Pattern Parsed))
 atomPattern' = choice
    [ tupleOrParensPat
-   , PatWildcard  <$ symbol "_"
-   , PatVar       <$> varIdent
-   , PatCon       <$> typeIdent <*> pure []
-   , PatList      <$> between (symbol "[") (symbol "]") (pattern' `sepBy` symbol ",")
-   , PatLit       <$> literal
+   , located (PatWildcard ParsedInfo  <$ symbol "_")
+   , located (PatVar ParsedInfo       <$> varIdent)
+   , located (PatCon ParsedInfo       <$> typeIdent <*> pure [])
+   , located (PatList ParsedInfo      <$> between (symbol "[") (symbol "]") (pattern' `sepBy` symbol ","))
+   , located (PatLit ParsedInfo       <$> literal)
    ]
 
-tupleOrParensPat :: Parser Pattern
-tupleOrParensPat = between (symbol "(") (symbol ")") $ do
+tupleOrParensPat :: Parser (Located (Pattern Parsed))
+tupleOrParensPat = located $ between (symbol "(") (symbol ")") $ do
    ts <- pattern' `sepBy` symbol ","
    case ts of
-      [] -> pure (PatTuple [])
-      [t] -> pure t
-      manyT -> pure (PatTuple manyT)
+      [] -> pure (PatTuple ParsedInfo [])
+      [t] -> pure (lNode t)
+      manyT -> pure (PatTuple ParsedInfo manyT)
 
 atomExpr :: Parser (Located (Expr Parsed))
 atomExpr = do
@@ -103,7 +103,7 @@ match' = do
    return Match {..}
 
 matchWing :: Parser (MatchWing Parsed)
-matchWing = MatchWing <$> located pattern' <* symbol "->" <*> expr
+matchWing = MatchWing <$> pattern' <* symbol "->" <*> expr
 
 term :: Parser (Located (Expr Parsed))
 term = do

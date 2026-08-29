@@ -46,6 +46,12 @@ assertFails p input =
       Right _ -> assertFailure "Expected failure, but parsing succeeded"
       Left _  -> return ()
 
+-- | `program` yields a `Text -> Program Parsed` waiting on the source text to
+-- fill in `progSource`; feed it back the same source that's given to
+-- `assertParses` so the produced `Program` can be compared directly.
+assertParsesProgram :: Text -> Program Parsed -> Assertion
+assertParsesProgram input = assertParses (fmap ($ input) program) input
+
 tests :: Test
 tests = TestList
    [ TestLabel "Identifiers" identTests
@@ -136,42 +142,42 @@ typeTests = TestList
 patternTests :: Test
 patternTests = TestList
    [ TestCase $
-      assertParses pattern' "_"
-      PatWildcard
+      assertParses pattern' "_" $
+         loc (PatWildcard ParsedInfo)
 
    , TestCase $
-      assertParses pattern' "x"
-      (PatVar (Ident "x"))
+      assertParses pattern' "x" $
+         loc (PatVar ParsedInfo (Ident "x"))
 
    , TestCase $
-      assertParses pattern' "Just x"
-      ( PatCon (Ident "Just")
-         [PatVar (Ident "x")]
-      )
+      assertParses pattern' "Just x" $
+         loc ( PatCon ParsedInfo (Ident "Just")
+            [loc $ PatVar ParsedInfo (Ident "x")]
+         )
 
    , TestCase $
-      assertParses pattern' "()"
-      (PatTuple [])
+      assertParses pattern' "()" $
+         loc (PatTuple ParsedInfo [])
 
    , TestCase $
-      assertParses pattern' "(x)"
-      (PatVar (Ident "x"))
+      assertParses pattern' "(x)" $
+         loc (PatVar ParsedInfo (Ident "x"))
 
    , TestCase $
-      assertParses pattern' "(x, y)"
-      ( PatTuple
-         [ PatVar (Ident "x")
-         , PatVar (Ident "y")
-         ]
-      )
+      assertParses pattern' "(x, y)" $
+         loc ( PatTuple ParsedInfo
+            [ loc $ PatVar ParsedInfo (Ident "x")
+            , loc $ PatVar ParsedInfo (Ident "y")
+            ]
+         )
 
    , TestCase $
-      assertParses pattern' "[x, y]"
-      ( PatList
-         [ PatVar (Ident "x")
-         , PatVar (Ident "y")
-         ]
-      )
+      assertParses pattern' "[x, y]" $
+         loc ( PatList ParsedInfo
+            [ loc $ PatVar ParsedInfo (Ident "x")
+            , loc $ PatVar ParsedInfo (Ident "y")
+            ]
+         )
 
    , TestCase $
       assertFails pattern' "(x,"
@@ -669,7 +675,7 @@ exprTests = TestLabel "Expr (atoms)" $ TestList
          loc $
             ExpLambda ParsedInfo $
                Lambda
-                  [PatVar (Ident "x")]
+                  [loc $ PatVar ParsedInfo (Ident "x")]
                   (loc $ ExpVar ParsedInfo Nothing (Ident "x"))
 
    , TestCase $
@@ -677,7 +683,7 @@ exprTests = TestLabel "Expr (atoms)" $ TestList
          loc $
             ExpLambda ParsedInfo $
                Lambda
-                  [PatVar (Ident "x"), PatVar (Ident "y")]
+                  [loc $ PatVar ParsedInfo (Ident "x"), loc $ PatVar ParsedInfo (Ident "y")]
                   (loc $ ExpVar ParsedInfo Nothing (Ident "x"))
 
    , TestCase $
@@ -685,7 +691,7 @@ exprTests = TestLabel "Expr (atoms)" $ TestList
          loc $
             ExpLambda ParsedInfo $
                Lambda
-                  [PatVar (Ident "a"), PatVar (Ident "b"), PatVar (Ident "c")]
+                  [loc $ PatVar ParsedInfo (Ident "a"), loc $ PatVar ParsedInfo (Ident "b"), loc $ PatVar ParsedInfo (Ident "c")]
                   (loc $ ExpVar ParsedInfo Nothing (Ident "c"))
 
    , TestCase $
@@ -693,7 +699,7 @@ exprTests = TestLabel "Expr (atoms)" $ TestList
          loc $
             ExpLambda ParsedInfo $
                Lambda
-                  [PatTuple [PatVar (Ident "x"), PatVar (Ident "y")]]
+                  [loc $ PatTuple ParsedInfo [loc $ PatVar ParsedInfo (Ident "x"), loc $ PatVar ParsedInfo (Ident "y")]]
                   (loc $ ExpVar ParsedInfo Nothing (Ident "x"))
 
    , TestCase $
@@ -701,7 +707,7 @@ exprTests = TestLabel "Expr (atoms)" $ TestList
          loc $
             ExpLambda ParsedInfo $
                Lambda
-                  [PatCon (Ident "MyStruct") [PatVar (Ident "a"), PatVar (Ident "b")]]
+                  [loc $ PatCon ParsedInfo (Ident "MyStruct") [loc $ PatVar ParsedInfo (Ident "a"), loc $ PatVar ParsedInfo (Ident "b")]]
                   (loc $ ExpVar ParsedInfo Nothing (Ident "a"))
 
    -- If
@@ -731,7 +737,7 @@ exprTests = TestLabel "Expr (atoms)" $ TestList
                LetIn
                   [ loc $
                         Let
-                           (PatVar $ Ident "x")
+                           (loc $ PatVar ParsedInfo $ Ident "x")
                            (loc $ ExpLit ParsedInfo $ LitInt 1)
                   ]
                   (loc $ ExpVar ParsedInfo Nothing $ Ident "x")
@@ -743,11 +749,11 @@ exprTests = TestLabel "Expr (atoms)" $ TestList
                LetIn
                   [ loc $
                         Let
-                           (PatVar $ Ident "x")
+                           (loc $ PatVar ParsedInfo $ Ident "x")
                            (loc $ ExpLit ParsedInfo $ LitInt 1)
                   , loc $
                         Let
-                           (PatVar $ Ident "y")
+                           (loc $ PatVar ParsedInfo $ Ident "y")
                            (loc $ ExpLit ParsedInfo $ LitInt 2)
                   ]
                   (loc $ ExpVar ParsedInfo Nothing $ Ident "x")
@@ -759,9 +765,9 @@ exprTests = TestLabel "Expr (atoms)" $ TestList
                LetIn
                   [ loc $
                         Let
-                           (PatTuple
-                              [ PatVar $ Ident "a"
-                              , PatVar $ Ident "b"
+                           (loc $ PatTuple ParsedInfo
+                              [ loc $ PatVar ParsedInfo $ Ident "a"
+                              , loc $ PatVar ParsedInfo $ Ident "b"
                               ])
                            (loc $ ExpVar ParsedInfo Nothing $ Ident "pair")
                   ]
@@ -775,7 +781,7 @@ exprTests = TestLabel "Expr (atoms)" $ TestList
                Match
                   (loc $ ExpVar ParsedInfo Nothing $ Ident "x")
                   [ MatchWing
-                        (loc PatWildcard)
+                        (loc $ PatWildcard ParsedInfo)
                         (loc $ ExpLit ParsedInfo $ LitInt 0)
                   ]
 
@@ -787,14 +793,14 @@ exprTests = TestLabel "Expr (atoms)" $ TestList
                   (loc $ ExpVar ParsedInfo Nothing $ Ident "x")
                   [ MatchWing
                         (loc $
-                           PatCon
+                           PatCon ParsedInfo
                               (Ident "Just")
-                              [PatVar $ Ident "y"])
+                              [loc $ PatVar ParsedInfo $ Ident "y"])
                         (loc $ ExpVar ParsedInfo Nothing $ Ident "y")
 
                   , MatchWing
                         (loc $
-                           PatCon
+                           PatCon ParsedInfo
                               (Ident "Nothing")
                               [])
                         (loc $ ExpLit ParsedInfo $ LitInt 0)
@@ -807,11 +813,11 @@ exprTests = TestLabel "Expr (atoms)" $ TestList
                Match
                   (loc $ ExpVar ParsedInfo Nothing $ Ident "xs")
                   [ MatchWing
-                     (loc $ PatList [])
+                     (loc $ PatList ParsedInfo [])
                      (loc $ ExpLit ParsedInfo $ LitInt 0)
 
                   , MatchWing
-                     (loc PatWildcard)
+                     (loc $ PatWildcard ParsedInfo)
                      (loc $ ExpLit ParsedInfo $ LitInt 1)
                   ]
 
@@ -1014,7 +1020,7 @@ functionTests = TestLabel "Functions" $ TestList
             loc $
                FuncImpl
                   (Ident "id")
-                  [PatVar $ Ident "x"]
+                  [loc $ PatVar ParsedInfo $ Ident "x"]
                   (loc $ ExpVar ParsedInfo Nothing $ Ident "x"))
 
    , TestCase $
@@ -1024,8 +1030,8 @@ functionTests = TestLabel "Functions" $ TestList
             loc $
                FuncImpl
                   (Ident "const")
-                  [ PatVar $ Ident "a"
-                  , PatVar $ Ident "b"
+                  [ loc $ PatVar ParsedInfo $ Ident "a"
+                  , loc $ PatVar ParsedInfo $ Ident "b"
                   ]
                   (loc $ ExpVar ParsedInfo Nothing $ Ident "a"))
 
@@ -1036,9 +1042,9 @@ functionTests = TestLabel "Functions" $ TestList
             loc $
                FuncImpl
                   (Ident "fst")
-                  [PatTuple
-                     [ PatVar $ Ident "a"
-                     , PatVar $ Ident "b"
+                  [loc $ PatTuple ParsedInfo
+                     [ loc $ PatVar ParsedInfo $ Ident "a"
+                     , loc $ PatVar ParsedInfo $ Ident "b"
                      ]]
                   (loc $ ExpVar ParsedInfo Nothing $ Ident "a"))
 
@@ -1049,7 +1055,7 @@ functionTests = TestLabel "Functions" $ TestList
             loc $
                FuncImpl
                   (Ident "isEmpty")
-                  [PatList []]
+                  [loc $ PatList ParsedInfo []]
                   (loc $ ExpCon ParsedInfo Nothing $ Ident "True"))
 
    -- Failures
@@ -1468,8 +1474,8 @@ systemTests = TestLabel "Systems" $ TestList
                SystemImpl
                   (Ident "Move")
                   [EntityPattern
-                     [ PatVar $ Ident "pos"
-                     , PatVar $ Ident "vel"
+                     [ EntPatBinding (loc $ PatVar ParsedInfo $ Ident "pos") AccessRead
+                     , EntPatBinding (loc $ PatVar ParsedInfo $ Ident "vel") AccessRead
                      ]]
                   Nothing
                   (loc $ ExpVar ParsedInfo Nothing $ Ident "pos"))
@@ -1483,7 +1489,7 @@ systemTests = TestLabel "Systems" $ TestList
                   (Ident "Move")
                   []
                   (Just
-                     [PatVar $ Ident "dt"])
+                     [loc $ PatVar ParsedInfo $ Ident "dt"])
                   (loc $ ExpVar ParsedInfo Nothing $ Ident "dt"))
 
    -- Failures
@@ -1498,11 +1504,11 @@ systemTests = TestLabel "Systems" $ TestList
 programTests :: Test
 programTests = TestLabel "Programs" $ TestList
    [ TestCase $
-      assertParses program
-         (T.unlines
+      let src = T.unlines
             [ "module Main exports *"
             , "fn main () -> Int;"
-            ])
+            ]
+      in assertParsesProgram src
          (Program
             (loc $
                ModuleDef
@@ -1517,15 +1523,16 @@ programTests = TestLabel "Programs" $ TestList
                            (Ident "main")
                            []
                            (TyCon $ Ident "Int")
-            ])
+            ]
+            src)
 
    , TestCase $
-      assertParses program
-         (T.unlines
+      let src = T.unlines
             [ "@mode = \"safe\""
             , "module Main exports *"
             , "extern type CString;"
-            ])
+            ]
+      in assertParsesProgram src
          (Program
             (loc $
                ModuleDef
@@ -1538,16 +1545,17 @@ programTests = TestLabel "Programs" $ TestList
                         ExternType
                            (Ident "CString")
                            []
-            ])
+            ]
+            src)
 
    , TestCase $
-      assertParses program
-         (T.unlines
+      let src = T.unlines
             [ "@mode = \"dynamic\""
             , "module Game.Main exports *"
             , "use Math *"
             , "type Bool = True | False;"
-            ])
+            ]
+      in assertParsesProgram src
          (Program
             (loc $
                ModuleDef
@@ -1567,7 +1575,8 @@ programTests = TestLabel "Programs" $ TestList
                         [ loc $ Ctor (Ident "True") PUnit
                         , loc $ Ctor (Ident "False") PUnit
                         ]
-            ])
+            ]
+            src)
 
    -- Failures
    , TestCase $

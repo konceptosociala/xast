@@ -1,6 +1,6 @@
 module Xast.Lowerer.Types where
 
-import Xast.AST (Type, Literal)
+import Xast.AST (Type, Literal, BindingAccess)
 import Data.Text (Text)
 
 data LowerState = LowerState {}
@@ -40,12 +40,8 @@ newtype KirBindingId = KirBindingId Int
 data KirBinding = KirBinding
    { kirBindType    :: Type
    , kirBindSrc     :: KirBindingSrc
-   , kirBindAccess  :: KirBindingAccess
+   , kirBindAccess  :: BindingAccess
    }
-
-data KirBindingAccess
-   = AccessRead
-   | AccessWrite
 
 data KirBindingSrc
    = SrcEntity
