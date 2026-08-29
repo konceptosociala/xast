@@ -464,7 +464,7 @@ printWarning (SWRedundantImport intr) = case intr of
                let Location pos _ len = loc
                    fname = sourceName pos
                in (ident, (toPosition pos len fname, Blank))
-          filename = (sourceName . lPos . lLocation . head) xs
+          filename = sourceName (head xs).location.pos
           report =
             Warn
             Nothing

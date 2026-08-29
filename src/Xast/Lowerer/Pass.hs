@@ -10,11 +10,11 @@ import Data.Function (on)
 import Data.List (groupBy, sortOn)
 
 lowerProgram :: Program Typed -> Lowerer Kira
-lowerProgram (Program _ _ stmts _) = do
-   let systemImpls = [x | (StmtSystem (SysImpl (Located _ x))) <- stmts]
-   let systemGroups = 
-         groupBy ((==) `on` sysImName)
-            $ sortOn sysImName systemImpls
+lowerProgram prog = do
+   let systemImpls = [x | (StmtSystem (SysImpl (Located _ x))) <- prog.stmts]
+   let systemGroups =
+         groupBy ((==) `on` (.name))
+            $ sortOn (.name) systemImpls
 
    Kira 
       <$> forM systemGroups 
@@ -28,7 +28,7 @@ lowerProgram (Program _ _ stmts _) = do
 
 lowerSystem :: SystemImpl Typed -> Lowerer KirSystem
 lowerSystem (SystemImpl name [EntityPattern pats] Nothing (Located _ _expr)) = do
-   let kirSysName = KirName (unIdent name)
+   let kirSysName = KirName name.inner
    let kirSysBindings = map patToBinding pats
    let kirSysBody = todo__ "system body lowering is not implemented"
 

@@ -3,7 +3,7 @@
 module Xast.Parser.Type where
 
 import Data.Function ((&))
-import Text.Megaparsec (choice, sepBy, between, some, MonadParsec (try), many, sepBy1)
+import Text.Megaparsec (choice, sepBy, between, some, MonadParsec (try), many, sepBy1, sepEndBy)
 
 import Xast.Parser.Ident
 import Xast.Parser.Common (Parser, symbol, lexeme, endOfStmt, located)
@@ -13,34 +13,34 @@ import Xast.Parser.Modifier (typeModifier)
 
 typeDef :: Parser (Located TypeDef)
 typeDef = located $ do
-   tdMods      <- many typeModifier
+   modifiers   <- many typeModifier
    _           <- symbol "type"
-   tdName      <- typeIdent
-   tdGenerics  <- many genericIdent
+   name        <- typeIdent
+   generics    <- many genericIdent
    _           <- symbol "="
-   tdCtors     <- ctor `sepBy1` symbol "|"
+   ctors       <- ctor `sepBy1` symbol "|"
    _           <- endOfStmt
 
    return TypeDef {..}
 
 ctor :: Parser (Located Ctor)
 ctor = located $ do
-   ctorName    <- typeIdent
-   ctorPayload <- payload
+   name    <- typeIdent
+   payload <- payload'
    return Ctor {..}
 
-payload :: Parser Payload
-payload = choice
-   [ PRecord   <$> between (symbol "{") (symbol "}") (field `sepBy` symbol ",")
+payload' :: Parser Payload
+payload' = choice
+   [ PRecord   <$> between (symbol "{") (symbol "}") (field `sepEndBy` symbol ",")
    , PTuple    <$> try (some (lexeme atomType))
    , PUnit     & pure
    ]
 
 field :: Parser Field
 field = do
-   fldName <- varIdent
-   _       <- symbol ":"
-   fldType <- type'
+   name  <- varIdent
+   _     <- symbol ":"
+   ty    <- type'
 
    return Field {..}
 

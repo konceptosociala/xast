@@ -10,7 +10,7 @@ import Data.Bifunctor (Bifunctor(first))
 import Data.Either (partitionEithers)
 import System.Directory (getCurrentDirectory, doesFileExist)
 
-import Xast.Config (xastConfigCodec, XastConfig (..), ProjectConfig (projModules))
+import Xast.Config (xastConfigCodec, projectConfig, modules)
 import Xast.Error.Types (XastError (..))
 import Xast.Parser.Program (parseProgram)
 import Xast.AST
@@ -60,14 +60,14 @@ runCompile_ dir = runExceptT $ do
 
    invalidModules <- liftIO $ filterM
       (\m -> not <$> doesFileExist (currentDir ++ "/" ++ moduleToPath m))
-      (projModules $ projectConfig config)
+      config.projectConfig.modules
 
    case invalidModules of
       (m:_) -> throwError [XastModuleNotFound m currentDir]
       []    -> return ()
 
    -- Parse modules
-   results <- liftIO $ traverse (parseOne currentDir) (projModules $ projectConfig config)
+   results <- liftIO $ traverse (parseOne currentDir) config.projectConfig.modules
    let (errors, programs) = partitionEithers results
    unless (null errors) $
       throwError errors

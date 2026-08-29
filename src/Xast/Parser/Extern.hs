@@ -16,10 +16,10 @@ externFunc :: Parser (Located ExternFunc)
 externFunc = located $ do
    _        <- symbol "extern"
    _        <- symbol "fn"
-   efnName  <- fnIdent
-   efnArgs  <- between (symbol "(") (symbol ")") (type' `sepBy` symbol ",")
+   name     <- fnIdent
+   args     <- between (symbol "(") (symbol ")") (type' `sepBy` symbol ",")
    _        <- symbol "->"
-   efnRet   <- type'
+   retType  <- type'
    _        <- endOfStmt
 
    return ExternFunc {..}
@@ -28,8 +28,8 @@ externType :: Parser (Located ExternType)
 externType = located $ do
    _           <- symbol "extern"
    _           <- symbol "type"
-   etName      <- typeIdent
-   etGenerics  <- many genericIdent
+   name        <- typeIdent
+   generics    <- many genericIdent
    _           <- endOfStmt
 
    return ExternType {..}

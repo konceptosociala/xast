@@ -4,7 +4,7 @@ module Xast.Parser.System where
 
 import Control.Applicative (optional)
 import Data.Maybe (isJust)
-import Text.Megaparsec (between, sepBy1, many, some, MonadParsec (lookAhead), choice)
+import Text.Megaparsec (between, sepBy1, many, some, MonadParsec (lookAhead), choice, sepEndBy1)
 
 import Xast.Parser.Common
 import Xast.Parser.Ident (typeIdent)
@@ -22,13 +22,13 @@ system = do
 
 systemDef :: Parser (Located SystemDef)
 systemDef = located $ do
-   sysMods   <- many sysModifier
-   _        <- symbol "system"
-   sysName  <- typeIdent
-   sysEnts  <- many queriedEntity
-   _        <- symbol "->"
-   sysRet   <- type'
-   sysWith  <- optional with
+   modifiers   <- many sysModifier
+   _           <- symbol "system"
+   name        <- typeIdent
+   entities    <- many queriedEntity
+   _           <- symbol "->"
+   retType     <- type'
+   with        <- optional with'
 
    _        <- endOfStmt
 
@@ -36,10 +36,10 @@ systemDef = located $ do
 
 queriedEntity :: Parser QueriedEntity
 queriedEntity = QueriedEntity <$> 
-   between (symbol "#(") (symbol ")") (type' `sepBy1` symbol ",")
+   between (symbol "#(") (symbol ")") (type' `sepEndBy1` symbol ",")
 
-with :: Parser [WithType]
-with = symbol "with" *> (withType `sepBy1` symbol ",")
+with' :: Parser [WithType]
+with' = symbol "with" *> (withType `sepBy1` symbol ",")
    where
       withType :: Parser WithType
       withType = choice
@@ -50,11 +50,11 @@ with = symbol "with" *> (withType `sepBy1` symbol ",")
 systemImpl :: Parser (Located (SystemImpl Parsed))
 systemImpl = located $ do
    _           <- symbol "system"
-   sysImName   <- typeIdent
-   sysImEnts   <- many entityPattern
-   sysImWith   <- optional $ symbol "with" *> some atomPattern'
+   name        <- typeIdent
+   entities    <- many entityPattern
+   with        <- optional $ symbol "with" *> some atomPattern'
    _           <- symbol "="
-   sysImBody   <- expr
+   body        <- expr
    _           <- endOfStmt
 
    return SystemImpl {..}
@@ -63,8 +63,5 @@ entityPattern :: Parser (EntityPattern Parsed)
 entityPattern = between (symbol "#(") (symbol ")") $
    EntityPattern <$> some entPatBinding
 
--- | Access is unknown until a system's declared return type is available, so
--- every pattern parses as `AccessRead` and gets its real access filled in
--- during name resolution (see `resolveEntityPattern`).
 entPatBinding :: Parser (EntPatBinding Parsed)
 entPatBinding = (`EntPatBinding` AccessRead) <$> atomPattern'

@@ -14,6 +14,11 @@ module Main exports {
 use Utils.Components *
 use Utils.Renderer *
 
+type MyRecord = MyRecord {
+    x : Int,
+    y : Int,
+};
+
 type LoopResult s r
     = Done r
     | Continue s;
@@ -95,7 +100,7 @@ fn moveRight(Pos) -> Pos;
 fn moveRight pos =
     pos { x = pos.x + 1 };
 
-system MoveSystem #(Pos, Velocity) -> Pos;
+system MoveSystem #(Pos, Velocity,) -> Pos;
 
 system MoveSystem #(pos (Velocity vx vy)) =
     Pos { x = pos.x + vx, y = pos.y + vy };

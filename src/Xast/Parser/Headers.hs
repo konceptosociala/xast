@@ -14,9 +14,9 @@ module' = Module <$> typeIdent `sepBy1` "."
 moduleDef :: Parser (Located ModuleDef)
 moduleDef = located $ do
    _        <- symbol "module"
-   mdName   <- module'
+   name     <- module'
    _        <- symbol "exports"
-   mdExport <- located exportPayload
+   export   <- located exportPayload
 
    return ModuleDef {..}
 
@@ -28,16 +28,16 @@ exportPayload = choice
 
 importDef :: Parser (Located ImportDef)
 importDef = located $ do
-   _           <- symbol "use"
-   imdMod      <- module'
-   imdPayload  <- importPayload
+   _              <- symbol "use"
+   importModule   <- module'
+   payload        <- importPayload
 
    return ImportDef {..}
 
 importPayload :: Parser ImportPayload
 importPayload = choice
    [ ImpAlias   <$ symbol "as" <*> located typeIdent
-   , ImpSelect  <$> between (symbol "{") (symbol "}") (located importIdent `sepBy1` symbol ",")
+   , ImpSelect  <$> between (symbol "{") (symbol "}") (located importIdent `sepEndBy1` symbol ",")
    , ImpFull    <$ symbol "*"
    ]
 

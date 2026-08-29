@@ -7,28 +7,24 @@ import Data.Text (Text, unpack)
 import Text.Megaparsec (SourcePos)
 
 data Located a = Located
-   { lLocation :: Location
-   , lNode     :: a
+   { location :: Location
+   , node     :: a
    }
-   deriving (Show, Ord)
-
-instance Functor Located where
-   fmap :: (a -> b) -> Located a -> Located b
-   fmap f (Located loc a) = Located loc (f a) 
+   deriving (Show, Ord, Functor, Foldable, Traversable)
 
 instance Eq a => Eq (Located a) where
    (==) :: Eq a => Located a -> Located a -> Bool
-   a == b = lNode a == lNode b
+   a == b = a.node == b.node
 
 data Location = Location 
-   { lPos :: SourcePos
-   , lOffset   :: Int
-   , lLength   :: Int
+   { pos    :: SourcePos
+   , offset :: Int
+   , length :: Int
    }
    deriving (Eq, Show, Ord)
 
 sortLocByPos :: Location -> Location -> Ordering
-sortLocByPos locA locB = compare (lPos locA) (lPos locB)
+sortLocByPos a b = compare a.pos b.pos
 
 data Modifier 
    = FnMod FnModifier
@@ -64,16 +60,12 @@ data ComponentDispatchMode
    deriving (Eq, Show)
 
 data Program a = Program 
-   { progModuleDef :: Located ModuleDef
-   , progImports :: [Located ImportDef]
-   , progStmts :: [Stmt a]
-   , progSource :: Text
+   { moduleDef :: Located ModuleDef
+   , imports   :: [Located ImportDef]
+   , stmts     :: [Stmt a]
+   , src       :: Text
    }
-   deriving (Eq, Show)
-
-instance Functor Program where
-   fmap :: (a -> b) -> Program a -> Program b
-   fmap f (Program modDef imps stmts src) = Program modDef imps (fmap (fmap f) stmts) src
+   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 type ModBind = Maybe Ident
 
@@ -84,8 +76,8 @@ newtype Resolved = ResolvedInfo (Maybe Resolution)
    deriving (Eq, Show)
 
 data Typed = TypedInfo
-   { tyInfoType :: Type
-   , tyInfoResolution :: Maybe Resolution
+   { ty  :: Type
+   , res :: Maybe Resolution
    }
    deriving (Eq, Show)
 
@@ -119,49 +111,7 @@ data Expr a
    | ExpRecConstruct a (RecConstruct a)         -- Point { x = 12, y = 34 }
    | ExpRecUpdate a (RecUpdate a)               -- value { field = 12, field2 = True }
    | ExpVarGetter a (Located (Expr a)) Getter   -- var.x, tuple.0
-   deriving (Eq, Show)
-
-instance Functor Expr where
-   fmap :: (a -> b) -> Expr a -> Expr b
-   fmap f = \case
-      ExpVar a modBind ident -> 
-         ExpVar (f a) modBind ident
-
-      ExpCon a modBind ident -> 
-         ExpCon (f a) modBind ident
-
-      ExpTuple a exprs -> 
-         ExpTuple (f a) (fmap (fmap (fmap f)) exprs)
-
-      ExpList a exprs -> 
-         ExpList (f a) (fmap (fmap (fmap f)) exprs)
-
-      ExpLit a lit -> 
-         ExpLit (f a) lit
-
-      ExpLambda a lambda -> 
-         ExpLambda (f a) (fmap f lambda)
-
-      ExpApp a e1 e2 -> 
-         ExpApp (f a) (fmap (fmap f) e1) (fmap (fmap f) e2)
-
-      ExpLetIn a letIn -> 
-         ExpLetIn (f a) (fmap f letIn)
-
-      ExpMatch a match -> 
-         ExpMatch (f a) (fmap f match)
-
-      ExpIfThen a ifThen -> 
-         ExpIfThen (f a) (fmap f ifThen)
-
-      ExpRecConstruct a recConstruct -> 
-         ExpRecConstruct (f a) (fmap f recConstruct)
-
-      ExpRecUpdate a recUpdate -> 
-         ExpRecUpdate (f a) (fmap f recUpdate)
-
-      ExpVarGetter a expr getter -> 
-         ExpVarGetter (f a) (fmap (fmap f) expr) getter
+   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data Getter
    = GetField Ident
@@ -169,32 +119,20 @@ data Getter
    deriving (Eq, Show)
 
 data RecConstruct a = RecConstruct
-   { rcBind :: ModBind
-   , rcCon :: Ident
-   , rcAssigns :: [RecAssign a]
+   { bind      :: ModBind
+   , con       :: Ident
+   , assigns   :: [RecAssign a]
    }
-   deriving (Eq, Show)
-
-instance Functor RecConstruct where
-   fmap :: (a -> b) -> RecConstruct a -> RecConstruct b
-   fmap f (RecConstruct rcBind rcCon rcAssigns) = RecConstruct rcBind rcCon (fmap (fmap f) rcAssigns)
+   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data RecUpdate a = RecUpdate
-   { ruBase :: Located (Expr a)
-   , ruAssigns :: [RecAssign a]
+   { base      :: Located (Expr a)
+   , assigns   :: [RecAssign a]
    }
-   deriving (Eq, Show)
-
-instance Functor RecUpdate where
-   fmap :: (a -> b) -> RecUpdate a -> RecUpdate b
-   fmap f (RecUpdate ruBase ruAssigns) = RecUpdate (fmap (fmap f) ruBase) (fmap (fmap f) ruAssigns)
+   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data RecAssign a = RecAssign (Located Ident) (Located (Expr a))
-   deriving (Eq, Show)
-
-instance Functor RecAssign where
-   fmap :: (a -> b) -> RecAssign a -> RecAssign b
-   fmap f (RecAssign ident expr) = RecAssign ident (fmap (fmap f) expr)
+   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data BuiltinOp 
    -- Math
@@ -221,62 +159,38 @@ data BuiltinOp
    deriving (Eq, Show)
 
 data Match a = Match
-   { mtExp :: Located (Expr a)
-   , mtMatches :: [MatchWing a]
+   { baseExpr  :: Located (Expr a)
+   , matches   :: [MatchWing a]
    }
-   deriving (Eq, Show)
-
-instance Functor Match where
-   fmap :: (a -> b) -> Match a -> Match b
-   fmap f (Match mtExp mtMatches) = Match (fmap (fmap f) mtExp) (fmap (fmap f) mtMatches)
+   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data MatchWing a = MatchWing (Located (Pattern a)) (Located (Expr a))
-   deriving (Eq, Show)
-
-instance Functor MatchWing where
-   fmap :: (a -> b) -> MatchWing a -> MatchWing b
-   fmap f (MatchWing pat expr) = MatchWing (fmap (fmap f) pat) (fmap (fmap f) expr)
+   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data IfThenElse a = IfThenElse
-   { iteIf :: Located (Expr a)
-   , iteThen :: Located (Expr a)
-   , iteElse :: Located (Expr a)
+   { ifExpr    :: Located (Expr a)
+   , thenExpr  :: Located (Expr a)
+   , elseExpr  :: Located (Expr a)
    }
-   deriving (Eq, Show)
-
-instance Functor IfThenElse where
-   fmap :: (a -> b) -> IfThenElse a -> IfThenElse b
-   fmap f (IfThenElse iteIf iteThen iteElse) = IfThenElse (fmap (fmap f) iteIf) (fmap (fmap f) iteThen) (fmap (fmap f) iteElse)
+   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data Lambda a = Lambda
-   { lamArgs :: [Located (Pattern a)]
-   , lamBody :: Located (Expr a)
+   { args :: [Located (Pattern a)]
+   , body :: Located (Expr a)
    }
-   deriving (Eq, Show)
-
-instance Functor Lambda where
-   fmap :: (a -> b) -> Lambda a -> Lambda b
-   fmap f (Lambda lamArgs lamBody) = Lambda (fmap (fmap (fmap f)) lamArgs) (fmap (fmap f) lamBody)
+   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data LetIn a = LetIn
-   { linBind :: [Located (Let a)]
-   , linExpr :: Located (Expr a)
+   { bindings  :: [Located (Let a)]
+   , bindExpr  :: Located (Expr a)
    }
-   deriving (Eq, Show)
-
-instance Functor LetIn where
-   fmap :: (a -> b) -> LetIn a -> LetIn b
-   fmap f (LetIn lamArgs lamBody) = LetIn (fmap (fmap (fmap f)) lamArgs) (fmap (fmap f) lamBody)
+   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data Let a = Let
-   { letPat :: Located (Pattern a)
-   , letValue :: Located (Expr a)
+   { pat    :: Located (Pattern a)
+   , value  :: Located (Expr a)
    }
-   deriving (Eq, Show)
-
-instance Functor Let where
-   fmap :: (a -> b) -> Let a -> Let b
-   fmap f (Let letPat letValue) = Let (fmap (fmap f) letPat) (fmap (fmap f) letValue)
+   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data Literal
    = LitString Text
@@ -291,46 +205,37 @@ data Extern = ExtFunc (Located ExternFunc) | ExtType (Located ExternType)
    deriving (Eq, Show)
 
 data ExternFunc = ExternFunc
-   { efnName :: Ident
-   , efnArgs :: [Type]
-   , efnRet :: Type
+   { name      :: Ident
+   , args      :: [Type]
+   , retType   :: Type
    }
    deriving (Eq, Show)
 
 data ExternType = ExternType
-   { etName :: Ident
-   , etGenerics :: [Ident]
+   { name      :: Ident
+   , generics  :: [Ident]
    }
    deriving (Eq, Show)
 
 data Func a = FnDef (Located FuncDef) | FnImpl (Located (FuncImpl a))
-   deriving (Eq, Show)
-
-instance Functor Func where
-   fmap :: (a -> b) -> Func a -> Func b
-   fmap f (FnImpl imp) = FnImpl (fmap (fmap f) imp)
-   fmap _ (FnDef def) = FnDef def
+   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 -- fn myFunc (Type1, Type2) -> TypeReturn
 data FuncDef = FuncDef
-   { fdMods :: [Modifier]
-   , fdName :: Ident
-   , fdArgs :: [Type]
-   , fdRet  :: Type
+   { modifiers :: [Modifier]
+   , name      :: Ident
+   , args      :: [Type]
+   , retType   :: Type
    }
    deriving (Eq, Show)
 
 -- fn IDENT arg1 arg2 ... argN = <IMPL>
 data FuncImpl a = FuncImpl
-   { fnName :: Ident
-   , fnArgs :: [Located (Pattern a)]
-   , fnBody :: Located (Expr a)
+   { name :: Ident
+   , args :: [Located (Pattern a)]
+   , body :: Located (Expr a)
    }
-   deriving (Eq, Show)
-
-instance Functor FuncImpl where
-   fmap :: (a -> b) -> FuncImpl a -> FuncImpl b
-   fmap f (FuncImpl fnName fnArgs fnBody) = FuncImpl fnName (fmap (fmap (fmap f)) fnArgs) (fmap (fmap f) fnBody)
+   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data Pattern a
    = PatVar a Ident                    -- a
@@ -339,7 +244,7 @@ data Pattern a
    | PatList a [Located (Pattern a)]   -- [a, 2, 3]
    | PatTuple a [Located (Pattern a)]  -- (a, _, 12)
    | PatCon a Ident [Located (Pattern a)] -- Either a b
-   deriving (Eq, Show)
+   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 patAnnotation :: Pattern a -> a
 patAnnotation = \case
@@ -351,28 +256,7 @@ patAnnotation = \case
    PatCon a _ _ -> a
 
 patType :: Pattern Typed -> Type
-patType = tyInfoType . patAnnotation 
-
-instance Functor Pattern where
-   fmap :: (a -> b) -> Pattern a -> Pattern b
-   fmap f = \case
-      PatVar a x ->
-         PatVar (f a) x
-
-      PatWildcard a ->
-         PatWildcard (f a)
-
-      PatLit a lit ->
-         PatLit (f a) lit
-
-      PatList a ps ->
-         PatList (f a) (fmap (fmap (fmap f)) ps)
-
-      PatTuple a ps ->
-         PatTuple (f a) (fmap (fmap (fmap f)) ps)
-
-      PatCon a ident ps ->
-         PatCon (f a) ident (fmap (fmap (fmap f)) ps)
+patType = (.ty) . patAnnotation
 
 newtype Module = Module [Ident]
    deriving (Eq, Ord)
@@ -387,8 +271,8 @@ instance Show Module where
    show (Module (x:xs)) = show x ++ "." ++ show (Module xs)
 
 data ModuleDef = ModuleDef
-   { mdName :: Module
-   , mdExport :: Located ExportPayload
+   { name   :: Module
+   , export :: Located ExportPayload
    }
    deriving (Eq, Show)
 
@@ -398,8 +282,8 @@ data ExportPayload
    deriving (Eq, Show)
 
 data ImportDef = ImportDef
-   { imdMod :: Module
-   , imdPayload :: ImportPayload
+   { importModule :: Module
+   , payload      :: ImportPayload
    }
    deriving (Eq, Show, Ord)
 
@@ -443,41 +327,29 @@ intersectImport
       else
          Nothing
 
-newtype Ident = Ident { unIdent :: Text }
+newtype Ident = Ident { inner :: Text }
    deriving (Eq, Ord, Generic)
 
 instance Show Ident where
    show :: Ident -> String
-   show = unpack . unIdent
+   show = unpack . (.inner)
 
 data Stmt a
    = StmtTypeDef (Located TypeDef)
    | StmtFunc (Func a)
    | StmtExtern Extern
    | StmtSystem (System a)
-   deriving (Eq, Show)
-
-instance Functor Stmt where
-   fmap :: (a -> b) -> Stmt a -> Stmt b
-   fmap f (StmtFunc func) = StmtFunc (fmap f func) 
-   fmap f (StmtSystem sys) = StmtSystem (fmap f sys) 
-   fmap _ (StmtExtern ext) = StmtExtern ext
-   fmap _ (StmtTypeDef td) = StmtTypeDef td
+   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data System a = SysDef (Located SystemDef) | SysImpl (Located (SystemImpl a))
-   deriving (Eq, Show)
-
-instance Functor System where
-   fmap :: (a -> b) -> System a -> System b
-   fmap f (SysImpl imp) = SysImpl (fmap (fmap f) imp)
-   fmap _ (SysDef def) = SysDef def
+   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data SystemDef = SystemDef
-   { sysMods   :: [Modifier]
-   , sysName   :: Ident
-   , sysEnts   :: [QueriedEntity]
-   , sysRet    :: Type
-   , sysWith   :: Maybe [WithType]
+   { modifiers :: [Modifier]
+   , name      :: Ident
+   , entities  :: [QueriedEntity]
+   , retType   :: Type
+   , with      :: Maybe [WithType]
    }
    deriving (Eq, Show)
 
@@ -490,51 +362,38 @@ data WithType
    deriving (Eq, Show)
 
 data SystemImpl a = SystemImpl
-   { sysImName :: Ident
-   , sysImEnts :: [EntityPattern a]
-   , sysImWith :: Maybe [Located (Pattern a)]
-   , sysImBody :: Located (Expr a)
+   { name      :: Ident
+   , entities  :: [EntityPattern a]
+   , with      :: Maybe [Located (Pattern a)]
+   , body      :: Located (Expr a)
    }
-   deriving (Eq, Show)
-
-instance Functor SystemImpl where
-   fmap :: (a -> b) -> SystemImpl a -> SystemImpl b
-   fmap f (SystemImpl name ents with body) =
-      SystemImpl name (fmap (fmap f) ents) (fmap (fmap (fmap (fmap f))) with) (fmap (fmap f) body)
+   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 newtype EntityPattern a = EntityPattern [EntPatBinding a]
-   deriving (Eq, Show)
+   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data EntPatBinding a = EntPatBinding
-   { entBindPat :: Located (Pattern a)
-   , entBindAccess :: BindingAccess
+   { pat       :: Located (Pattern a)
+   , access    :: BindingAccess
    }
-   deriving (Eq, Show)
-
-instance Functor EntPatBinding where
-   fmap :: (a -> b) -> EntPatBinding a -> EntPatBinding b
-   fmap f (EntPatBinding pat acc) = EntPatBinding (fmap (fmap f) pat) acc
+   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data BindingAccess
    = AccessRead
    | AccessWrite
    deriving (Eq, Show)
 
-instance Functor EntityPattern where
-   fmap :: (a -> b) -> EntityPattern a -> EntityPattern b
-   fmap f (EntityPattern ps) = EntityPattern (fmap (fmap f) ps)
-
 data TypeDef = TypeDef
-   { tdMods       :: [Modifier]
-   , tdName       :: Ident
-   , tdGenerics   :: [Ident]
-   , tdCtors      :: [Located Ctor]
+   { modifiers :: [Modifier]
+   , name      :: Ident
+   , generics  :: [Ident]
+   , ctors     :: [Located Ctor]
    }
    deriving (Eq, Show)
 
 data Ctor = Ctor
-   { ctorName     :: Ident
-   , ctorPayload  :: Payload
+   { name      :: Ident
+   , payload   :: Payload
    }
    deriving (Eq, Show)
 
@@ -545,8 +404,8 @@ data Payload
    deriving (Eq, Show)
 
 data Field = Field      -- fieldOne : Int
-   { fldName :: Ident   -- field2 : Maybe Bool
-   , fldType :: Type
+   { name   :: Ident   -- field2 : Maybe Bool
+   , ty     :: Type
    }
    deriving (Eq, Show)
 

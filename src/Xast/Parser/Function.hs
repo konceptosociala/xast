@@ -16,23 +16,23 @@ func = (FnDef <$> funcDef) <-> (FnImpl <$> funcImpl)
 
 funcDef :: Parser (Located FuncDef)
 funcDef = located $ do
-   fdMods   <- many fnModifier
-   _        <- symbol "fn"
-   fdName   <- fnIdent
-   fdArgs   <- between (symbol "(") (symbol ")") (type' `sepBy` symbol ",")
-   _        <- symbol "->"
-   fdRet    <- type'
-   _        <- endOfStmt
+   modifiers   <- many fnModifier
+   _           <- symbol "fn"
+   name        <- fnIdent
+   args        <- between (symbol "(") (symbol ")") (type' `sepBy` symbol ",")
+   _           <- symbol "->"
+   retType     <- type'
+   _           <- endOfStmt
 
    return FuncDef {..}
 
 funcImpl :: Parser (Located (FuncImpl Parsed))
 funcImpl = located $ do
    _        <- symbol "fn"
-   fnName   <- fnIdent
-   fnArgs   <- many atomPattern'
+   name     <- fnIdent
+   args     <- many atomPattern'
    _        <- symbol "="
-   fnBody   <- expr
+   body     <- expr
    _        <- endOfStmt
 
    return FuncImpl {..}

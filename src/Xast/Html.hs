@@ -27,7 +27,7 @@ data Html
    = Element Text [(Text, Text)] [Html]
    | VoidElement Text [(Text, Text)]
    | TextNode Text
-   | RawHtml Text -- ^ embedded verbatim, e.g. CSS/JS bodies. Caller is responsible for its safety.
+   | RawHtml Text
 
 -- #### RENDERING ####
 
@@ -117,14 +117,14 @@ raw = RawHtml
 
 collectTokens :: Located (Expr Typed) -> [(Location, Type)]
 collectTokens (Located loc node) = case node of
-   ExpVar ty _ _ ->
-      [(loc, tyInfoType ty)]
+   ExpVar info _ _ ->
+      [(loc, info.ty)]
 
-   ExpCon ty _ _ ->
-      [(loc, tyInfoType ty)]
+   ExpCon info _ _ ->
+      [(loc, info.ty)]
 
-   ExpLit ty _ ->
-      [(loc, tyInfoType ty)]
+   ExpLit info _ ->
+      [(loc, info.ty)]
 
    ExpTuple _ xs ->
       concatMap collectTokens xs
@@ -159,14 +159,14 @@ collectTokens (Located loc node) = case node of
 
 collectPatternTokens :: Located (Pattern Typed) -> [(Location, Type)]
 collectPatternTokens (Located loc node) = case node of
-   PatVar ty _ ->
-      [(loc, tyInfoType ty)]
+   PatVar info _ ->
+      [(loc, info.ty)]
 
-   PatWildcard ty ->
-      [(loc, tyInfoType ty)]
+   PatWildcard info ->
+      [(loc, info.ty)]
 
-   PatLit ty _ ->
-      [(loc, tyInfoType ty)]
+   PatLit info _ ->
+      [(loc, info.ty)]
 
    PatList _ ps ->
       concatMap collectPatternTokens ps
@@ -186,14 +186,14 @@ collectStmtTokens = \case
       concatMap collectPatternTokens pats ++ collectTokens funcBody
 
    StmtSystem (SysImpl (Located _ (SystemImpl _ entPats mWith sysBody))) ->
-      concatMap (\(EntityPattern bindings) -> concatMap (collectPatternTokens . entBindPat) bindings) entPats
+      concatMap (\(EntityPattern bindings) -> concatMap (collectPatternTokens . (.pat)) bindings) entPats
          ++ maybe [] (concatMap collectPatternTokens) mWith
          ++ collectTokens sysBody
 
    _ -> []
 
 renderSourceWithTokens :: Text -> [(Location, Type)] -> [Html]
-renderSourceWithTokens src tokens = go 0 (sortOn (lOffset . fst) tokens)
+renderSourceWithTokens src tokens = go 0 (sortOn ((.offset) . fst) tokens)
    where
       srcLen = T.length src
 
@@ -204,8 +204,8 @@ renderSourceWithTokens src tokens = go 0 (sortOn (lOffset . fst) tokens)
          | off < pos = go pos rest -- overlapping/out-of-order token, skip defensively
          | otherwise = gapHtml ++ [tokenSpan tokTxt (T.pack (typename ty))] ++ go (off + len) rest
          where
-            off = lOffset loc
-            len = lLength loc
+            off = loc.offset
+            len = loc.length
             gap = T.take (off - pos) (T.drop pos src)
             gapHtml = [text gap | not (T.null gap)]
             tokTxt = T.take len (T.drop off src)
@@ -217,7 +217,7 @@ renderTypedSource :: Text -> Located (Expr Typed) -> Html
 renderTypedSource src expr = pre_ [("class", "code")] (renderSourceWithTokens src (collectTokens expr))
 
 renderTypedProgram :: Program Typed -> Html
-renderTypedProgram prog = pre_ [("class", "code")] (renderSourceWithTokens (progSource prog) (collectProgramTokens prog))
+renderTypedProgram prog = pre_ [("class", "code")] (renderSourceWithTokens prog.src (collectProgramTokens prog))
 
 typedAstStyle :: Text
 typedAstStyle = T.unlines

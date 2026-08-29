@@ -40,15 +40,15 @@ inferIdent = try $ Ident <$> symbol "_"
 fnIdent :: Parser Ident
 fnIdent = try $ do
    ident <- camelCase
-   if unIdent ident `elem` reserved
-      then fail ("keyword `" ++ unpack (unIdent ident) ++ "` is reserved")
+   if ident.inner `elem` reserved
+      then fail ("keyword `" ++ unpack ident.inner ++ "` is reserved")
       else return ident
 
 varIdent :: Parser Ident
 varIdent = try $ do
    ident <- camelCase
-   if unIdent ident `elem` reserved
-      then fail ("keyword `" ++ unpack (unIdent ident) ++ "` is reserved")
+   if ident.inner `elem` reserved
+      then fail ("keyword `" ++ unpack ident.inner ++ "` is reserved")
       else return ident
 
 pascalCase :: Parser Ident

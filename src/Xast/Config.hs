@@ -12,30 +12,30 @@ import qualified Data.Bifunctor as Bifunctor
 import qualified Data.Text as T
 
 data XastConfig = XastConfig
-   { projectConfig :: ProjectConfig
-   , apiConfig :: ApiConfig
+   { projectConfig   :: ProjectConfig
+   , apiConfig       :: ApiConfig
    }
    deriving (Eq, Show, Generic)
 
 xastConfigCodec :: TomlCodec XastConfig
 xastConfigCodec = XastConfig
-   <$> Toml.table projectConfigCodec "project"  .= projectConfig
-   <*> Toml.table apiConfigCodec     "api"      .= apiConfig
+   <$> Toml.table projectConfigCodec "project"  .= (.projectConfig)
+   <*> Toml.table apiConfigCodec     "api"      .= (.apiConfig)
 
 data ProjectConfig = ProjectConfig
-   { projName :: Text
-   , projVersion :: ProjectVersion
-   , projAuthor :: Maybe Text
-   , projModules :: [Module]
+   { name      :: Text
+   , version   :: ProjectVersion
+   , author    :: Maybe Text
+   , modules   :: [Module]
    }
    deriving (Eq, Show, Generic)
 
 projectConfigCodec :: TomlCodec ProjectConfig
 projectConfigCodec = ProjectConfig
-   <$> Toml.text                  "name"    .= projName
-   <*> projectVersionCodec        "version" .= projVersion
-   <*> Toml.dioptional (Toml.text "author") .= projAuthor
-   <*> projectModulesCodec        "modules" .= projModules
+   <$> Toml.text                  "name"    .= (.name)
+   <*> projectVersionCodec        "version" .= (.version)
+   <*> Toml.dioptional (Toml.text "author") .= (.author)
+   <*> projectModulesCodec        "modules" .= (.modules)
 
 projectModulesCodec :: Toml.Key -> TomlCodec [Module]
 projectModulesCodec = Toml.arrayOf (Toml._TextBy showModule parseModule) 
@@ -82,12 +82,12 @@ parsePart name t =
          "invalid " <> name <> " version: " <> t
 
 data ApiConfig = ApiConfig
-   { apiLabels :: [Text]
-   , apiComponents :: [Text]
+   { labels :: [Text]
+   , components :: [Text]
    }
    deriving (Eq, Show, Generic)
 
 apiConfigCodec :: TomlCodec ApiConfig
 apiConfigCodec = ApiConfig
-   <$> Toml.arrayOf Toml._Text "labels"     .= apiLabels
-   <*> Toml.arrayOf Toml._Text "components" .= apiComponents
+   <$> Toml.arrayOf Toml._Text "labels"     .= (.labels)
+   <*> Toml.arrayOf Toml._Text "components" .= (.components)

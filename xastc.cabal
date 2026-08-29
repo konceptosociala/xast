@@ -10,6 +10,10 @@ build-type:         Simple
 
 common warnings
     ghc-options: -Wall
+    default-extensions:
+        OverloadedRecordDot
+        NoFieldSelectors
+        DuplicateRecordFields
 
 library
     import:           warnings

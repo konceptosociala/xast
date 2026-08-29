@@ -7,24 +7,24 @@ import qualified Data.Set as S
 import Xast.AST
 
 data Env = Env
-   { envVars :: M.Map Ident VarInfo
-   , envFns :: M.Map Ident FuncSig 
-   , envSystems :: M.Map Ident SystemSig
+   { vars      :: M.Map Ident VarInfo
+   , functions :: M.Map Ident FuncSig 
+   , systems   :: M.Map Ident SystemSig
    }
 
 emptyEnv :: Env
 emptyEnv = Env M.empty M.empty M.empty
 
 data SymTable = SymTable
-   { modules :: M.Map Module ModuleInfo
-   , currentModule :: Module
-   , varIdSupply :: Int
-   , localIdSupply :: Int
-   , fnIdSupply :: Int
-   , ctorIdSupply :: Int
-   , externIdSupply :: Int
-   , tyVarSupply :: Int
-   , tySubst :: M.Map Int Type
+   { modules         :: M.Map Module ModuleInfo
+   , currentModule   :: Module
+   , varIdSupply     :: Int
+   , localIdSupply   :: Int
+   , fnIdSupply      :: Int
+   , ctorIdSupply    :: Int
+   , externIdSupply  :: Int
+   , tyVarSupply     :: Int
+   , tySubst         :: M.Map Int Type
    }
    deriving (Eq, Show)
 
@@ -45,8 +45,8 @@ data QualifiedName = QualifiedName Module Ident
    deriving (Eq, Show, Ord)
 
 data ModuleInfo = ModuleInfo
-   { modSymbols :: M.Map Ident SymbolInfo
-   , modExports :: S.Set Ident
+   { symbols :: M.Map Ident SymbolInfo
+   , exports :: S.Set Ident
    }
    deriving (Eq, Show)
 
@@ -64,16 +64,16 @@ data SymbolInfo
    deriving (Eq, Show)
    
 data CtorSig = CtorSig
-   { ctorSigOwner :: Ident
-   , ctorSigGenereics :: [Ident]
-   , ctorSigFieldNames :: Maybe [Ident] -- `Just` field names when declared as a record, `Nothing` otherwise
-   , ctorSigFields :: [Type]
+   { owner        :: Ident
+   , generics     :: [Ident]
+   , fieldNames   :: Maybe [Ident] -- `Just` field names when declared as a record, `Nothing` otherwise
+   , fields       :: [Type]
    }
    deriving (Eq, Show)
 
 data TypeSig = TypeSig
-   { tySigCtors :: S.Set Ident
-   , tySigGenerics :: [Ident]
+   { ctors     :: S.Set Ident
+   , generics  :: [Ident]
    }
    deriving (Eq, Show)
 
@@ -88,16 +88,16 @@ symbolLoc = \case
    SymbolExternType loc   -> loc
 
 data SystemSig = SystemSig
-   { sysSigName :: Ident
-   , sysSigEnts :: [QueriedEntity]
-   , sysSigRet :: Type
-   , sysSigWith :: Maybe [WithType]
+   { name      :: Ident
+   , entities  :: [QueriedEntity]
+   , retType   :: Type
+   , with      :: Maybe [WithType]
    }
    deriving (Eq, Show)
 
 data VarInfo = VarInfo
-   { varType :: Type
-   , varId :: VarId
+   { ty :: Type
+   , id :: VarId
    }
    deriving (Eq, Show)
 
@@ -105,19 +105,19 @@ newtype VarId = VarId Int
    deriving (Eq, Show)
 
 data FuncSig = FuncSig
-   { funcArgs :: [Type]
-   , funcRet :: Type
+   { args      :: [Type]
+   , retType   :: Type
    }
    deriving (Eq, Show)
 
 funcSig :: FuncDef -> FuncSig
-funcSig (FuncDef _ _ tys rt) = FuncSig tys rt
+funcSig fn = FuncSig fn.args fn.retType
 
 externFuncSig :: ExternFunc -> FuncSig
-externFuncSig (ExternFunc _ tys rt) = FuncSig tys rt
+externFuncSig fn = FuncSig fn.args fn.retType
 
 systemSig :: SystemDef -> SystemSig
-systemSig (SystemDef _ name ents ret withs) =
-   SystemSig name ents ret withs
+systemSig def =
+   SystemSig def.name def.entities def.retType def.with
 
 data SuggestedImports = SuggestedImports Ident [Module]

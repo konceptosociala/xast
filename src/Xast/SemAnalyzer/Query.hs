@@ -10,33 +10,33 @@ import Control.Monad.State (gets)
 import qualified Data.Set as S
 
 lookupLocal :: Ident -> SemAnalyzer (Maybe VarInfo)
-lookupLocal x = asks (M.lookup x . envVars)
+lookupLocal x = asks (M.lookup x . (.vars))
 
 withVars :: M.Map Ident VarInfo -> SemAnalyzer a -> SemAnalyzer a
 withVars newVars =
-   local (\env -> env { envVars = M.union newVars (envVars env) })
+   local (\env -> env { vars = M.union newVars env.vars })
 
 -- | Look up a symbol by name in a specific module's symbol table
 lookupInModule :: Module -> Ident -> SemAnalyzer (Maybe SymbolInfo)
 lookupInModule m ident = gets $ \st ->
-   M.lookup m (modules st) >>= \mi -> M.lookup ident (modSymbols mi)
+   M.lookup m st.modules >>= \mi -> M.lookup ident mi.symbols
 
 -- | Look up a symbol in the current module
 lookupCurrentModule :: Ident -> SemAnalyzer (Maybe SymbolInfo)
 lookupCurrentModule ident = do
-   m <- gets currentModule
+   m <- gets (.currentModule)
    lookupInModule m ident
 
 -- | Look up a symbol brought in by unqualified imports (ImpFull or ImpSelect)
 lookupUnqualifiedSymbol :: [Located ImportDef] -> Ident -> SemAnalyzer (Maybe SymbolInfo)
 lookupUnqualifiedSymbol imps ident = do
-   ms <- gets modules
+   ms <- gets (.modules)
    let go [] = pure Nothing
        go (Located _ (ImportDef m pl) : rest) =
          case pl of
             ImpAlias _ -> go rest
             ImpSelect ids ->
-               if any ((== ident) . lNode) ids
+               if any ((== ident) . (.node)) ids
                   then lookupInModule m ident >>= \case
                      Just sym -> pure (Just sym)
                      Nothing  -> go rest
@@ -45,8 +45,8 @@ lookupUnqualifiedSymbol imps ident = do
                case M.lookup m ms of
                   Nothing -> go rest
                   Just mi ->
-                     if S.member ident (modExports mi)
-                        then pure (M.lookup ident (modSymbols mi))
+                     if S.member ident mi.exports
+                        then pure (M.lookup ident mi.symbols)
                         else go rest
    go imps
 

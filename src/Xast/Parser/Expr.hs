@@ -34,7 +34,7 @@ tupleOrParensPat = located $ between (symbol "(") (symbol ")") $ do
    ts <- pattern' `sepBy` symbol ","
    case ts of
       [] -> pure (PatTuple ParsedInfo [])
-      [t] -> pure (lNode t)
+      [t] -> pure t.node
       manyT -> pure (PatTuple ParsedInfo manyT)
 
 atomExpr :: Parser (Located (Expr Parsed))
@@ -72,9 +72,9 @@ tupleOrParens = between (symbol "(") (symbol ")") $ do
 
 recConstruct :: Parser (RecConstruct Parsed)
 recConstruct = do
-   rcBind    <- optional (try (typeIdent <* symbol "."))
-   rcCon     <- typeIdent
-   rcAssigns <- between
+   bind    <- optional (try (typeIdent <* symbol "."))
+   con     <- typeIdent
+   assigns <- between
       (symbol "{")
       (symbol "}")
       (recAssign `sepEndBy1` symbol ",")
@@ -96,9 +96,9 @@ varGetter = choice
 match' :: Parser (Match Parsed)
 match' = do
    _         <- symbol "match"
-   mtExp     <- expr
+   baseExpr  <- expr
    _         <- symbol "with"
-   mtMatches <- matchWing `sepBy1` symbol ","
+   matches   <- matchWing `sepBy1` symbol ","
 
    return Match {..}
 
@@ -282,37 +282,37 @@ expr = makeExprParser term table
 ifThenElse :: Parser (IfThenElse Parsed)
 ifThenElse = do
    _        <- symbol "if"
-   iteIf    <- expr
+   ifExpr   <- expr
    _        <- symbol "then"
-   iteThen  <- expr
+   thenExpr <- expr
    _        <- symbol "else"
-   iteElse  <- expr
+   elseExpr <- expr
 
    return IfThenElse {..}
 
 lambda :: Parser (Lambda Parsed)
 lambda = do
    _        <- symbol ".\\"
-   lamArgs  <- some pattern'
+   args     <- some pattern'
    _        <- symbol "->"
-   lamBody  <- expr
+   body     <- expr
 
    return Lambda {..}
 
 letIn :: Parser (LetIn Parsed)
 letIn = do
-   linBind <- let' `sepBy1` symbol "and"
-   _       <- symbol "in"
-   linExpr <- expr
+   bindings <- let' `sepBy1` symbol "and"
+   _        <- symbol "in"
+   bindExpr <- expr
 
    return LetIn {..}
 
 let' :: Parser (Located (Let Parsed))
 let' = located $ do
    _         <- symbol "let"
-   letPat    <- pattern'
+   pat       <- pattern'
    _         <- symbol "="
-   letValue  <- expr
+   value     <- expr
 
    return Let {..}
 
@@ -331,7 +331,7 @@ tupleOrParensLit = between (symbol "(") (symbol ")") $ do
    ts <- located literal `sepBy` symbol ","
    case ts of
       [] -> pure (LitTuple [])
-      [t] -> pure (lNode t)
+      [t] -> pure t.node
       manyT -> pure (LitTuple manyT)
 
 floatLiteral :: Parser Float

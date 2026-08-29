@@ -1,9 +1,9 @@
 module Xast.Utils.Pretty where
 
 data Colored = Colored
-   { clrText :: String
-   , clrColor :: Color
-   , clrBold :: Bool
+   { text   :: String
+   , color  :: Color
+   , isBold :: Bool
    }
 
 data Color
@@ -43,28 +43,28 @@ instance ToColored String where
    toColored x = Colored x White False
 
 bold :: ToColored a => a -> Colored
-bold x = let c = toColored x in c { clrBold = True }
+bold x = let c = toColored x in c { isBold = True }
 
 red :: ToColored a => a -> Colored
-red x = let c = toColored x in c { clrColor = Red }
+red x = let c = toColored x in c { color = Red }
 
 green :: ToColored a => a -> Colored
-green x = let c = toColored x in c { clrColor = Green }
+green x = let c = toColored x in c { color = Green }
 
 yellow :: ToColored a => a -> Colored
-yellow x = let c = toColored x in c { clrColor = Yellow }
+yellow x = let c = toColored x in c { color = Yellow }
 
 blue :: ToColored a => a -> Colored
-blue x = let c = toColored x in c { clrColor = Blue }
+blue x = let c = toColored x in c { color = Blue }
 
 magenta :: ToColored a => a -> Colored
-magenta x = let c = toColored x in c { clrColor = Magenta }
+magenta x = let c = toColored x in c { color = Magenta }
 
 cyan :: ToColored a => a -> Colored
-cyan x = let c = toColored x in c { clrColor = Cyan }
+cyan x = let c = toColored x in c { color = Cyan }
 
 white :: ToColored a => a -> Colored
-white x = let c = toColored x in c { clrColor = White }
+white x = let c = toColored x in c { color = White }
 
 black :: ToColored a => a -> Colored
-black x = let c = toColored x in c { clrColor = Black }
+black x = let c = toColored x in c { color = Black }

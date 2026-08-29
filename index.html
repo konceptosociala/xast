@@ -32,6 +32,11 @@ pre.code { white-space: pre-wrap; font-size: 14px; line-height: 1.7; margin: 0; 
 use Utils.Components *
 use Utils.Renderer *
 
+type MyRecord = MyRecord {
+    x : Int,
+    y : Int,
+};
+
 type LoopResult s r
     = Done r
     | Continue s;
@@ -113,7 +118,7 @@ fn moveRight(Pos) -&gt; Pos;
 fn moveRight <span class="tok" data-type="Pos" tabindex="0">pos </span>=
     <span class="tok" data-type="Pos" tabindex="0">pos </span>{ x = <span class="tok" data-type="Pos" tabindex="0">pos</span>.x <span class="tok" data-type="fn(Int, Int) -&gt; Int" tabindex="0">+</span> <span class="tok" data-type="Int" tabindex="0">1 </span>};
 
-system MoveSystem #(Pos, Velocity) -&gt; Pos;
+system MoveSystem #(Pos, Velocity,) -&gt; Pos;
 
 system MoveSystem #(<span class="tok" data-type="Pos" tabindex="0">pos </span>(Velocity <span class="tok" data-type="Int" tabindex="0">vx </span><span class="tok" data-type="Int" tabindex="0">vy</span>)) =
     Pos { x = <span class="tok" data-type="Pos" tabindex="0">pos</span>.x <span class="tok" data-type="fn(Int, Int) -&gt; Int" tabindex="0">+</span> <span class="tok" data-type="Int" tabindex="0">vx</span>, y = <span class="tok" data-type="Pos" tabindex="0">pos</span>.y <span class="tok" data-type="fn(Int, Int) -&gt; Int" tabindex="0">+</span> <span class="tok" data-type="Int" tabindex="0">vy </span>};
