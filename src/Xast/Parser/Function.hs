@@ -30,7 +30,7 @@ funcImpl :: Parser (Located (FuncImpl Parsed))
 funcImpl = located $ do
    _        <- symbol "fn"
    name     <- fnIdent
-   args     <- many atomPattern'
+   args     <- many (FnArgPat <$> atomPattern')
    _        <- symbol "="
    body     <- expr
    _        <- endOfStmt

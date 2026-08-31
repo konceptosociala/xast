@@ -5,6 +5,7 @@ import Data.List (intercalate)
 import GHC.Generics (Generic)
 import Data.Text (Text, unpack)
 import Text.Megaparsec (SourcePos)
+import Xast.Utils.Generic (unreachableWith)
 
 data Located a = Located
    { location :: Location
@@ -232,10 +233,23 @@ data FuncDef = FuncDef
 -- fn IDENT arg1 arg2 ... argN = <IMPL>
 data FuncImpl a = FuncImpl
    { name :: Ident
-   , args :: [Located (Pattern a)]
+   , args :: [FnArg a]
    , body :: Located (Expr a)
    }
    deriving (Eq, Show, Functor, Foldable, Traversable)
+
+data FnArg a
+   = FnArgPat (Located (Pattern a))
+   | FnArgBare Ident
+   deriving (Eq, Show, Functor, Foldable, Traversable)
+
+getFnArgPat :: FnArg a -> Located (Pattern a)
+getFnArgPat (FnArgPat p) = p
+getFnArgPat _ = unreachableWith "trying to get fnArgPat in a wrong phase (after desugaring)"
+
+getFnArgBare :: FnArg a -> Ident
+getFnArgBare (FnArgBare i) = i
+getFnArgBare _ = unreachableWith "trying to get fnArgBare in a wrong phase (before desugaring)"
 
 data Pattern a
    = PatVar a Ident                    -- a
@@ -415,7 +429,7 @@ data Type
    | TyApp Type Type    -- Maybe a, Either a Int...
    | TyTuple [Type]     -- (Bool, a, Maybe String)
    | TyFn [Type] Type   -- fn(Type1, Type2 ... TypeN) -> TypeRet
-   | TyVar Int
+   | TyVar Int          -- t0, t3
    | TyInvalid          -- <invalid>
    deriving (Eq, Show)
 

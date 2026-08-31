@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-unused-matches #-}
 module Xast.SemAnalyzer.Analysis where
 
 import Control.Monad.Except (ExceptT(..))
@@ -7,7 +8,7 @@ import Control.Monad.State
 import Control.Monad.Writer (listen, censor)
 import Control.Monad (forM_, unless, when, foldM, zipWithM_, zipWithM, forM)
 import Data.Maybe (mapMaybe, fromJust, fromMaybe)
-import Data.List (sortBy, intersperse)
+import Data.List (sortBy, intersperse, sortOn, groupBy)
 import Data.Foldable (foldl')
 import qualified Data.Set as S
 import qualified Data.Map as M
@@ -17,7 +18,7 @@ import Xast.Error.Types
 import Xast.Utils.List (allEqual, pairs)
 import Xast.SemAnalyzer.Monad
 import Xast.SemAnalyzer.Types
-import Data.Function ((&))
+import Data.Function ((&), on)
 import Xast.SemAnalyzer.Query
 import Text.Megaparsec (SourcePos(sourceName))
 import Control.Applicative ((<|>))
@@ -55,10 +56,15 @@ fullAnalysis reportWarnings saveFile progs = do
    -- substitution map so the typed AST reflects fully-resolved types.
    let progsZonked = map (zonkProgram st4.tySubst) progsTyped
 
+   -- Temporary HTML generation pass
+   ---------------------------------
    let htmlProgs = map renderTypedProgram progsZonked
    let htmlBox = div_ [] (intersperse hr htmlProgs)
    let txt = renderDocument (typedAstPage "Typed AST" htmlBox)
    _ <- lift $ saveFile "index.html" (unpack txt)
+   ---------------------------------
+
+   (progsDesugared1, st5, warns5) <- ExceptT $ pure $ runPhase env st4 (forM progsZonked desugarProgram)
 
    return $ sum $ map length [warns1, warns2, warns3, warns4]
 
@@ -436,10 +442,10 @@ resolveNames (Program md@(Located _ (ModuleDef m _)) imps stmts src) = do
    modify $ \st -> st { currentModule = m }
    stmts' <- forM stmts $ \case
       StmtFunc (FnImpl (Located implLoc (FuncImpl fnIdent args body))) -> do
-         scope <- freshLocalScope (foldMap (collectPatternVars . (.node)) args)
+         scope <- freshLocalScope (foldMap (collectPatternVars . (.node)) (map getFnArgPat args))
          body' <- resolveExprAt scope imps body
-         let args' = map resolvePattern args
-         pure $ StmtFunc (FnImpl (Located implLoc (FuncImpl fnIdent args' body')))
+         let args' = map (resolvePattern . getFnArgPat) args
+         pure $ StmtFunc (FnImpl (Located implLoc (FuncImpl fnIdent (map FnArgPat args') body')))
 
       StmtSystem (SysImpl (Located implLoc (SystemImpl sysIdent entPats mWith body))) -> do
          entScope  <- freshLocalScope (foldMap (\(EntityPattern bs) -> foldMap (collectPatternVars . (.node) . (.pat)) bs) entPats)
@@ -706,7 +712,7 @@ typeCheckStmt imps (StmtFunc (FnImpl (Located implLoc (FuncImpl fnIdent pats exp
       errSem (SEFnArityMismatch implLoc fnIdent (length argTypes) (length pats))
 
    -- 2) match patterns and args types
-   inferred <- zipWithM (inferPattern imps) argTypes pats
+   inferred <- zipWithM (inferPattern imps) argTypes (map getFnArgPat pats)
    let (pats', varMaps) = unzip inferred
    let patVars = M.unions varMaps
 
@@ -716,7 +722,7 @@ typeCheckStmt imps (StmtFunc (FnImpl (Located implLoc (FuncImpl fnIdent pats exp
    -- 4) compare types
    compareTypes implLoc retType (typeOf expr')
 
-   pure $ StmtFunc (FnImpl (Located implLoc (FuncImpl fnIdent pats' expr')))
+   pure $ StmtFunc (FnImpl (Located implLoc (FuncImpl fnIdent (map FnArgPat pats') expr')))
 
 typeCheckStmt imps (StmtSystem (SysImpl (Located implLoc (SystemImpl sysIdent entPats mWith body)))) = do
    (SystemSig _ sigEnts sigRet sigWith) <- fromJust <$> lookupCurrentSystem sysIdent
@@ -1314,3 +1320,22 @@ genericList = TyApp (TyCon (Ident "List")) <$> freshTyVar
 
 boolType :: Type
 boolType = TyCon (Ident "Bool")
+
+-- #### Desugaring ####
+
+desugarProgram :: Program Typed -> SemAnalyzer (Program Typed)
+desugarProgram prog = do
+   -- Functions
+   let fmImpls = [x | StmtFunc (FnImpl (Located _ x)) <- prog.stmts]
+   let fnGroups =
+         groupBy ((==) `on` (.name))
+            $ sortOn (.name) fmImpls
+
+   desugared <- forM fnGroups $ \group -> do
+      let fstImpl = head group
+      let pats = map (\i -> map ((.node) . getFnArgPat) i.args) group
+      let match = Match
+
+      return $ FuncImpl fstImpl.name
+
+   undefined
