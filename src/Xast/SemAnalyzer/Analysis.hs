@@ -1371,7 +1371,61 @@ desugarFn group = do
       (ExpMatch DesugaredInfo {res = Nothing, ty = retType} matchExpr)
 
 desugarSys :: [SystemImpl Typed] -> SemAnalyzer (SystemImpl Desugared)
-desugarSys group = undefined
+desugarSys group = do
+   let fstImpl = head group
+
+   -- Flatten every entity's component patterns
+   let flattenClause i =
+         concatMap (\(EntityPattern bs) -> map (.pat) bs) i.entities
+            ++ fromMaybe [] i.with
+
+   let entityTypes = concatMap (\(EntityPattern bs) -> map ((.ty) . patAnnotation . (.pat)) bs) fstImpl.entities
+   let withTypes = maybe [] (map ((.ty) . patAnnotation)) fstImpl.with
+   let argTypes = entityTypes ++ withTypes
+
+   -- Tuple patterns and bodies
+   let tupleAnn = DesugaredInfo {res = Nothing, ty = TyTuple argTypes}
+   let patBodies = flip map group $ \i ->
+         ( PatTuple tupleAnn $ map (fmap desugaredAnn) (flattenClause i)
+         , fmap desugaredAnn i.body
+         )
+
+   -- Define param names, one per flattened position
+   args <- forM argTypes $ const freshParam
+   let typedArgs = zipWith (\(lid, name) ty -> (lid, name, ty)) args argTypes
+
+   -- Base expression
+   let baseExpr = ExpTuple tupleAnn $ flip map typedArgs $ \(lid, name, ty) ->
+         ExpVar DesugaredInfo {res = Just (ResLocal lid), ty = ty} Nothing name
+
+   -- Generate match
+   let matchExpr = Match baseExpr $ map (uncurry MatchWing) patBodies
+   let retType = (exprAnnotation (snd (head patBodies))).ty
+
+   -- Rebuild the entity/with shape from `fstImpl`, substituting each
+   -- component's pattern with its freshly named param.
+   let (entityArgs, withArgs) = splitAt (length entityTypes) typedArgs
+
+   let mkVar (lid, name, ty) = PatVar (DesugaredInfo {res = Just (ResLocal lid), ty = ty}) name
+
+   let rebuildEntities _ [] = []
+       rebuildEntities avail (EntityPattern bindings : rest) =
+         let (used, remaining) = splitAt (length bindings) avail
+             newBindings = zipWith
+                  (\arg binding -> EntPatBinding (mkVar arg) binding.access)
+                  used bindings
+         in EntityPattern newBindings : rebuildEntities remaining rest
+
+   let newEntities = rebuildEntities entityArgs fstImpl.entities
+   let newWith = fmap (const (map mkVar withArgs)) fstImpl.with
+
+   -- Construct new system impl
+   return $ SystemImpl
+      fstImpl.location
+      fstImpl.name
+      newEntities
+      newWith
+      (ExpMatch DesugaredInfo {res = Nothing, ty = retType} matchExpr)
 
 freshParam :: SemAnalyzer (LocalId, Ident)
 freshParam = do

@@ -4,7 +4,7 @@ module Xast.Parser.System where
 
 import Control.Applicative (optional)
 import Data.Maybe (isJust)
-import Text.Megaparsec (between, sepBy1, many, some, MonadParsec (lookAhead), choice, sepEndBy1)
+import Text.Megaparsec (between, sepBy1, many, some, MonadParsec (lookAhead), choice, sepEndBy1, sepBy)
 
 import Xast.Parser.Common
 import Xast.Parser.Ident (typeIdent)
@@ -51,7 +51,7 @@ systemImpl :: Parser (SystemImpl Parsed)
 systemImpl = withLoc $ do
    _           <- symbol "system"
    name        <- typeIdent
-   entities    <- many entityPattern
+   entities    <- entityPattern `sepBy` symbol ","
    with        <- optional $ symbol "with" *> some atomPattern'
    _           <- symbol "="
    body        <- expr
@@ -60,8 +60,7 @@ systemImpl = withLoc $ do
    return $ \location -> SystemImpl {..}
 
 entityPattern :: Parser (EntityPattern Parsed)
-entityPattern = between (symbol "#(") (symbol ")") $
-   EntityPattern <$> some entPatBinding
+entityPattern = EntityPattern <$> some entPatBinding
 
 entPatBinding :: Parser (EntPatBinding Parsed)
 entPatBinding = (`EntPatBinding` AccessRead) <$> atomPattern'

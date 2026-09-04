@@ -1,12 +1,11 @@
 module Test exports *
 
 extern type Int;
-extern type Bool;
 extern fn opAdd(Int, Int) -> Int;
-extern fn opNot(Bool) -> Bool;
 
 system Hello #(Int) -> Int;
-system Hello #(n) = n + 1;
+system Hello 100   = 0;
+system Hello other = other + 1;
 
 -- static void Hello(ecs_iter_t *it) {
 --     int32_t *i = ecs_field(it, int32_t, 0);
