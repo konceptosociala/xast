@@ -25,6 +25,7 @@ import Control.Applicative ((<|>))
 import Xast.Utils.Generic (unreachableWith, (<--))
 import Xast.Html (renderDocument, renderTypedProgram, div_, hr, typedAstPage)
 import Data.Text (unpack)
+import qualified Data.Text as T
 
 -- #### FULL ANALYSIS ####
 
@@ -76,7 +77,7 @@ qualify ident = do
    return (QualifiedName module_ ident)
 
 enterModule :: ModuleDef -> SemAnalyzer ()
-enterModule (ModuleDef m _) = do
+enterModule (ModuleDef _ m _) = do
    st <- get
 
    case M.lookup m st.modules of
@@ -87,26 +88,26 @@ enterModule (ModuleDef m _) = do
             }
 
 declareStmts :: Program Parsed -> SemAnalyzer ()
-declareStmts (Program (Located _ md@(ModuleDef m _)) _ stmts _) = do
+declareStmts (Program md@(ModuleDef _ m _) _ stmts _) = do
    enterModule md
    modify $ \st -> st { currentModule = m }
    forM_ stmts declareStmt
 
 declareStmt :: Stmt Parsed -> SemAnalyzer ()
 declareStmt = \case
-   StmtFunc (FnDef fd@(Located _ (FuncDef _ ident _ _))) ->
+   StmtFunc (FnDef fd@(FuncDef _ _ ident _ _)) ->
       declareFn ident fd
 
-   StmtTypeDef td@(Located _ (TypeDef _ ident _ _)) ->
+   StmtTypeDef td@(TypeDef _ _ ident _ _) ->
       declareType ident td
 
-   StmtExtern (ExtFunc ef@(Located _ (ExternFunc ident _ _))) ->
+   StmtExtern (ExtFunc ef@(ExternFunc _ ident _ _)) ->
       declareExternFn ident ef
 
-   StmtExtern (ExtType et@(Located _ (ExternType ident _))) ->
+   StmtExtern (ExtType et@(ExternType _ ident _)) ->
       declareExternType ident et
 
-   StmtSystem (SysDef sd@(Located _(SystemDef _ ident _ _ _))) ->
+   StmtSystem (SysDef sd@(SystemDef _ _ ident _ _ _)) ->
       declareSystem ident sd
 
    _ -> return ()
@@ -131,8 +132,8 @@ declareSymbol ident sym re = do
                      st.modules
             }
 
-declareFn :: Ident -> Located FuncDef -> SemAnalyzer ()
-declareFn ident (Located loc fd@(FuncDef _ fnIdent fnArgs _)) = do
+declareFn :: Ident -> FuncDef -> SemAnalyzer ()
+declareFn ident fd@(FuncDef loc _ fnIdent fnArgs _) = do
    -- Report function gayness
    let args = length fnArgs
    when (args > 6) $
@@ -141,12 +142,12 @@ declareFn ident (Located loc fd@(FuncDef _ fnIdent fnArgs _)) = do
    fid <- freshFunctionId
    declareSymbol ident (SymbolFn loc fid (funcSig fd)) SEFnRedeclaration
 
-declareType :: Ident -> Located TypeDef -> SemAnalyzer ()
-declareType ident (Located loc (TypeDef _ _ generics ctors)) = do
-   let ctorNames = S.fromList [ctor.name | Located _ ctor <- ctors]
+declareType :: Ident -> TypeDef -> SemAnalyzer ()
+declareType ident (TypeDef loc _ _ generics ctors) = do
+   let ctorNames = S.fromList [ctor.name | ctor <- ctors]
        typeSig = TypeSig ctorNames generics
 
-   case [ctor | Located _ ctor <- ctors, ctor.name == ident] of
+   case [ctor | ctor <- ctors, ctor.name == ident] of
       [selfCtor] -> do
          let (fieldNames, fieldTys) = payloadFields selfCtor.payload
          cid <- freshConstructorId
@@ -156,12 +157,12 @@ declareType ident (Located loc (TypeDef _ _ generics ctors)) = do
       _ ->
          declareSymbol ident (SymbolType loc typeSig) SETypeRedeclaration
 
-   forM_ ctors $ \(Located ctorLoc ctor) ->
+   forM_ ctors $ \ctor ->
       unless (ctor.name == ident) $ do
          let (fieldNames, fieldTys) = payloadFields ctor.payload
          cid <- freshConstructorId
          declareSymbol ctor.name
-               (SymbolCtor ctorLoc cid (CtorSig ident generics fieldNames fieldTys))
+               (SymbolCtor ctor.location cid (CtorSig ident generics fieldNames fieldTys))
                SECtorRedeclaration
    where
       payloadFields = \case
@@ -169,17 +170,17 @@ declareType ident (Located loc (TypeDef _ _ generics ctors)) = do
          (PTuple tys) -> (Nothing, tys)
          (PRecord fs) -> (Just (map (.name) fs), map (.ty) fs)
 
-declareExternFn :: Ident -> Located ExternFunc -> SemAnalyzer ()
-declareExternFn ident (Located loc ef) = do
+declareExternFn :: Ident -> ExternFunc -> SemAnalyzer ()
+declareExternFn ident ef@(ExternFunc loc _ _ _) = do
    eid <- freshExternId
    declareSymbol ident (SymbolExternFn loc eid (externFuncSig ef)) SEExternFnRedeclaration
 
-declareExternType :: Ident -> Located ExternType -> SemAnalyzer ()
-declareExternType ident (Located loc _) =
+declareExternType :: Ident -> ExternType -> SemAnalyzer ()
+declareExternType ident (ExternType loc _ _) =
    declareSymbol ident (SymbolExternType loc) SEExternTypeRedeclaration
 
-declareSystem :: Ident -> Located SystemDef -> SemAnalyzer ()
-declareSystem ident (Located loc sd) =
+declareSystem :: Ident -> SystemDef -> SemAnalyzer ()
+declareSystem ident sd@(SystemDef loc _ _ _ _ _) =
    declareSymbol ident (SymbolSystem loc (systemSig sd)) SESystemRedeclaration
 
 -- #### RESOLVE IMPORTS ####
@@ -261,7 +262,7 @@ resolveAmbiguity (Program _ imps _ _) = do
             pure ()
 
 resolveImportDeclConflicts :: Program Parsed -> SemAnalyzer ()
-resolveImportDeclConflicts (Program (Located _ (ModuleDef m _)) imps _ _) = do
+resolveImportDeclConflicts (Program (ModuleDef _ m _) imps _ _) = do
    ms <- gets (.modules)
    let addMany mp ident loc = M.insertWith S.union ident (S.singleton loc) mp
    imported <- foldM
@@ -359,7 +360,7 @@ setModuleExports m exps =
          }
 
 resolveInvalidExports :: Program Parsed -> SemAnalyzer ()
-resolveInvalidExports (Program (Located _ (ModuleDef m (Located loc exps))) _ _ _) =
+resolveInvalidExports (Program (ModuleDef _ m (Located loc exps)) _ _ _) =
    case exps of
       ExpSelect ids -> do
          moduleData <- getModuleSymbols m
@@ -396,7 +397,7 @@ resolveCyclicImports progs = do
          )
 
 getModuleName :: Program Parsed -> (Module, Location)
-getModuleName (Program (Located loc (ModuleDef name _)) _ _ _) = (name, loc)
+getModuleName (Program (ModuleDef loc name _) _ _ _) = (name, loc)
 
 getImports :: Program Parsed -> [Module]
 getImports (Program _ imports _ _) = [module_ | Located _ (ImportDef module_ _) <- imports]
@@ -429,27 +430,27 @@ detectCycle moduleMap moduleLocations visited path current loc
                   )
 
 resolveSelfImport :: Program Parsed -> SemAnalyzer ()
-resolveSelfImport (Program (Located from (ModuleDef this _)) imports _ _) =
+resolveSelfImport (Program (ModuleDef from this _) imports _ _) =
    case filter (\(Located _ (ImportDef imported _)) -> imported == this) imports of
       (Located to _):_ -> errSem (SESelfImportError this from to)
       [] -> return ()
 
 -- #### RESOLVE NAMES ####
 resolveNames :: Program Parsed -> SemAnalyzer (Program Resolved)
-resolveNames (Program md@(Located _ (ModuleDef m _)) imps stmts src) = do
+resolveNames (Program md@(ModuleDef _ m _) imps stmts src) = do
    resolveDefImplMatches stmts
 
    modify $ \st -> st { currentModule = m }
    stmts' <- forM stmts $ \case
-      StmtFunc (FnImpl (Located implLoc (FuncImpl fnIdent args body))) -> do
-         scope <- freshLocalScope (foldMap (collectPatternVars . (.node)) (map getFnArgPat args))
+      StmtFunc (FnImpl (FuncImpl implLoc fnIdent args body)) -> do
+         scope <- freshLocalScope (foldMap collectPatternVars args)
          body' <- resolveExprAt scope imps body
-         let args' = map (resolvePattern . getFnArgPat) args
-         pure $ StmtFunc (FnImpl (Located implLoc (FuncImpl fnIdent (map FnArgPat args') body')))
+         let args' = map resolvePattern args
+         pure $ StmtFunc (FnImpl (FuncImpl implLoc fnIdent args' body'))
 
-      StmtSystem (SysImpl (Located implLoc (SystemImpl sysIdent entPats mWith body))) -> do
-         entScope  <- freshLocalScope (foldMap (\(EntityPattern bs) -> foldMap (collectPatternVars . (.node) . (.pat)) bs) entPats)
-         withScope <- freshLocalScope (maybe S.empty (foldMap (collectPatternVars . (.node))) mWith)
+      StmtSystem (SysImpl (SystemImpl implLoc sysIdent entPats mWith body)) -> do
+         entScope  <- freshLocalScope (foldMap (\(EntityPattern bs) -> foldMap (collectPatternVars . (.pat)) bs) entPats)
+         withScope <- freshLocalScope (maybe S.empty (foldMap collectPatternVars) mWith)
          body' <- resolveExprAt (M.union entScope withScope) imps body
 
          sig <- lookupCurrentSystem sysIdent
@@ -458,7 +459,7 @@ resolveNames (Program md@(Located _ (ModuleDef m _)) imps stmts src) = do
              sigEnts' = map Just sigEnts ++ repeat Nothing
          let entPats' = zipWith (resolveEntityPattern sigRet) sigEnts' entPats
          let mWith' = fmap (map resolvePattern) mWith
-         pure $ StmtSystem (SysImpl (Located implLoc (SystemImpl sysIdent entPats' mWith' body')))
+         pure $ StmtSystem (SysImpl (SystemImpl implLoc sysIdent entPats' mWith' body'))
 
       StmtSystem (SysDef def) -> pure $ StmtSystem (SysDef def)
 
@@ -474,12 +475,12 @@ resolveDefImplMatches :: [Stmt Parsed] -> SemAnalyzer ()
 resolveDefImplMatches stmts = go stmts stmts
    where
       go (x:xs) allStmts = case x of
-         StmtFunc (FnImpl (Located impLoc (FuncImpl impIdent _ _))) ->
+         StmtFunc (FnImpl (FuncImpl impLoc impIdent _ _)) ->
             let matching = flip mapMaybe allStmts $ \case
-                  StmtFunc (FnDef (Located defLoc (FuncDef _ defIdent _ _))) -> 
-                     if defIdent == impIdent then 
+                  StmtFunc (FnDef (FuncDef defLoc _ defIdent _ _)) ->
+                     if defIdent == impIdent then
                         Just defLoc
-                     else 
+                     else
                         Nothing
                   _ -> Nothing
                 defCount = length matching
@@ -489,23 +490,23 @@ resolveDefImplMatches stmts = go stmts stmts
             else if defCount > 1 then do
                errSem (SEExtraFnDef impLoc impIdent matching)
                go xs allStmts
-            else 
+            else
                go xs allStmts
 
-         StmtFunc (FnDef (Located defLoc (FuncDef _ defIdent _ _))) ->
+         StmtFunc (FnDef (FuncDef defLoc _ defIdent _ _)) ->
             let matching = flip filter allStmts $ \case
-                  StmtFunc (FnImpl (Located _ (FuncImpl impIdent _ _))) -> impIdent == defIdent
+                  StmtFunc (FnImpl (FuncImpl _ impIdent _ _)) -> impIdent == defIdent
                   _ -> False
                 count = length matching
             in if count == 0 then do
                errSem (SEMissingFnImpls defLoc defIdent)
                go xs allStmts
-            else 
+            else
                go xs allStmts
 
-         StmtSystem (SysImpl (Located impLoc (SystemImpl impIdent _ _ _))) ->
+         StmtSystem (SysImpl (SystemImpl impLoc impIdent _ _ _)) ->
             let matching = flip mapMaybe allStmts $ \case
-                  StmtSystem (SysDef (Located defLoc (SystemDef _ defIdent _ _ _))) ->
+                  StmtSystem (SysDef (SystemDef defLoc _ defIdent _ _ _)) ->
                      if defIdent == impIdent then
                         Just defLoc
                      else
@@ -521,9 +522,9 @@ resolveDefImplMatches stmts = go stmts stmts
             else
                go xs allStmts
 
-         StmtSystem (SysDef (Located defLoc (SystemDef _ defIdent _ _ _))) ->
+         StmtSystem (SysDef (SystemDef defLoc _ defIdent _ _ _)) ->
             let matching = flip filter allStmts $ \case
-                  StmtSystem (SysImpl (Located _ (SystemImpl impIdent _ _ _))) -> impIdent == defIdent
+                  StmtSystem (SysImpl (SystemImpl _ impIdent _ _ _)) -> impIdent == defIdent
                   _ -> False
                 count = length matching
             in if count == 0 then do
@@ -541,12 +542,12 @@ collectPatternVars = \case
    PatVar _ x    -> S.singleton x
    PatWildcard _ -> S.empty
    PatLit _ _    -> S.empty
-   PatList _ ps  -> foldMap (collectPatternVars . (.node)) ps
-   PatTuple _ ps -> foldMap (collectPatternVars . (.node)) ps
-   PatCon _ _ ps -> foldMap (collectPatternVars . (.node)) ps
+   PatList _ ps  -> foldMap collectPatternVars ps
+   PatTuple _ ps -> foldMap collectPatternVars ps
+   PatCon _ _ ps -> foldMap collectPatternVars ps
 
-resolvePattern :: Located (Pattern Parsed) -> Located (Pattern Resolved)
-resolvePattern = fmap (fmap (const (ResolvedInfo Nothing)))
+resolvePattern :: Pattern Parsed -> Pattern Resolved
+resolvePattern = fmap (\(ParsedInfo loc) -> ResolvedInfo loc Nothing)
 
 componentAccess :: Type -> Type -> BindingAccess
 componentAccess sysRet ty
@@ -576,135 +577,135 @@ resolveEntityPattern sysRet mEnt (EntityPattern bindings) =
 resolveExprAt
    :: M.Map Ident LocalId
    -> [Located ImportDef]
-   -> Located (Expr Parsed)
-   -> SemAnalyzer (Located (Expr Resolved))
-resolveExprAt scope imps le@(Located l _) = Located l <$> resolveExpr scope imps le
+   -> Expr Parsed
+   -> SemAnalyzer (Expr Resolved)
+resolveExprAt = resolveExpr
 
 resolveExpr
    :: M.Map Ident LocalId
    -> [Located ImportDef]
-   -> Located (Expr Parsed)
+   -> Expr Parsed
    -> SemAnalyzer (Expr Resolved)
-resolveExpr scope imps (Located loc expr) = case expr of
-   ExpVar _ Nothing x -> case M.lookup x scope of
-      Just lid -> pure $ ExpVar (ResolvedInfo (Just (ResLocal lid))) Nothing x
+resolveExpr scope imps expr = case expr of
+   ExpVar (ParsedInfo loc) Nothing x -> case M.lookup x scope of
+      Just lid -> pure $ ExpVar (ResolvedInfo loc (Just (ResLocal lid))) Nothing x
       Nothing -> do
          modSym <- lookupCurrentModule x
          impSym <- lookupUnqualifiedSymbol imps x
          case modSym <|> impSym of
-            Just (SymbolFn _ fid _)       -> pure $ fmap (\_ -> ResolvedInfo (Just (ResFunction fid))) expr
-            Just (SymbolExternFn _ eid _) -> pure $ fmap (\_ -> ResolvedInfo (Just (ResExternFunction eid))) expr
+            Just (SymbolFn _ fid _)       -> pure $ ExpVar (ResolvedInfo loc (Just (ResFunction fid))) Nothing x
+            Just (SymbolExternFn _ eid _) -> pure $ ExpVar (ResolvedInfo loc (Just (ResExternFunction eid))) Nothing x
             _ -> do
                errSem (SEUndefinedVar loc x)
-               pure $ ExpVar (ResolvedInfo Nothing) Nothing x
+               pure $ ExpVar (ResolvedInfo loc Nothing) Nothing x
 
-   ExpVar _ (Just alias) x ->
+   ExpVar (ParsedInfo loc) (Just alias) x ->
       let hasAlias = \case
             Located _ (ImportDef _ (ImpAlias (Located _ a))) -> a == alias
             _ -> False
       in if not $ any hasAlias imps then do
          errSem (SEUndefinedAlias (sourceName loc.pos) alias)
-         pure $ ExpVar (ResolvedInfo Nothing) (Just alias) x
+         pure $ ExpVar (ResolvedInfo loc Nothing) (Just alias) x
       else do
          sym <- lookupQualifiedSymbol imps alias x
          case sym of
-            Just (SymbolFn _ fid _)       -> pure $ ExpVar (ResolvedInfo (Just (ResFunction fid))) (Just alias) x
-            Just (SymbolExternFn _ eid _) -> pure $ ExpVar (ResolvedInfo (Just (ResExternFunction eid))) (Just alias) x
+            Just (SymbolFn _ fid _)       -> pure $ ExpVar (ResolvedInfo loc (Just (ResFunction fid))) (Just alias) x
+            Just (SymbolExternFn _ eid _) -> pure $ ExpVar (ResolvedInfo loc (Just (ResExternFunction eid))) (Just alias) x
             _ -> do
                errSem (SEUndefinedVar loc x)
-               pure $ ExpVar (ResolvedInfo Nothing) (Just alias) x
+               pure $ ExpVar (ResolvedInfo loc Nothing) (Just alias) x
 
-   ExpCon _ Nothing x -> do
+   ExpCon (ParsedInfo loc) Nothing x -> do
       modCon <- lookupCurrentConstructor x
       impCon <- lookupUnqualifiedConstructor imps x
       case modCon <|> impCon of
-         Just (SymbolCtor _ cid _) -> pure $ ExpCon (ResolvedInfo (Just (ResConstructor cid))) Nothing x
+         Just (SymbolCtor _ cid _) -> pure $ ExpCon (ResolvedInfo loc (Just (ResConstructor cid))) Nothing x
          _ -> do
             errSem (SEUndefinedCon loc x)
-            pure $ ExpCon (ResolvedInfo Nothing) Nothing x
+            pure $ ExpCon (ResolvedInfo loc Nothing) Nothing x
 
-   ExpCon _ (Just alias) x ->
+   ExpCon (ParsedInfo loc) (Just alias) x ->
       let hasAlias = \case
             Located _ (ImportDef _ (ImpAlias (Located _ a))) -> a == alias
             _ -> False
       in if not $ any hasAlias imps then do
          errSem (SEUndefinedAlias (sourceName loc.pos) alias)
-         pure $ ExpCon (ResolvedInfo Nothing) (Just alias) x
+         pure $ ExpCon (ResolvedInfo loc Nothing) (Just alias) x
       else do
          con <- lookupQualifiedConstructor imps alias x
          case con of
-            Just (SymbolCtor _ cid _) -> pure $ ExpCon (ResolvedInfo (Just (ResConstructor cid))) (Just alias) x
+            Just (SymbolCtor _ cid _) -> pure $ ExpCon (ResolvedInfo loc (Just (ResConstructor cid))) (Just alias) x
             _ -> do
                errSem (SEUndefinedCon loc x)
-               pure $ ExpCon (ResolvedInfo Nothing) (Just alias) x
+               pure $ ExpCon (ResolvedInfo loc Nothing) (Just alias) x
 
-   ExpTuple _ xs -> ExpTuple (ResolvedInfo Nothing) <$> mapM (resolveExprAt scope imps) xs
+   ExpTuple (ParsedInfo loc) xs -> ExpTuple (ResolvedInfo loc Nothing) <$> mapM (resolveExprAt scope imps) xs
 
-   ExpList _ xs -> ExpList (ResolvedInfo Nothing) <$> mapM (resolveExprAt scope imps) xs
+   ExpList (ParsedInfo loc) xs -> ExpList (ResolvedInfo loc Nothing) <$> mapM (resolveExprAt scope imps) xs
 
-   ExpLit _ lit -> pure $ ExpLit (ResolvedInfo Nothing) lit
+   ExpLit (ParsedInfo loc) lit -> pure $ ExpLit (ResolvedInfo loc Nothing) lit
 
-   ExpLambda _ (Lambda args body) -> do
-      argScope <- freshLocalScope (foldMap (collectPatternVars . (.node)) args)
+   ExpLambda (ParsedInfo loc) (Lambda args body) -> do
+      argScope <- freshLocalScope (foldMap collectPatternVars args)
       body' <- resolveExprAt (M.union argScope scope) imps body
       let args' = map resolvePattern args
-      pure $ ExpLambda (ResolvedInfo Nothing) (Lambda args' body')
+      pure $ ExpLambda (ResolvedInfo loc Nothing) (Lambda args' body')
 
-   ExpApp _ lhs rhs -> do
+   ExpApp (ParsedInfo loc) lhs rhs -> do
       lhs' <- resolveExprAt scope imps lhs
       rhs' <- resolveExprAt scope imps rhs
-      pure $ ExpApp (ResolvedInfo Nothing) lhs' rhs'
+      pure $ ExpApp (ResolvedInfo loc Nothing) lhs' rhs'
 
-   ExpLetIn _ (LetIn binds body) -> do
-      let localScope = foldMap (collectPatternVars . (.node) . (.pat) . (.node)) binds
+   ExpLetIn (ParsedInfo loc) (LetIn binds body) -> do
+      let localScope = foldMap (collectPatternVars . (.pat)) binds
       bindScope <- freshLocalScope localScope
       let scope' = M.union bindScope scope
-      binds' <- forM binds $ \(Located bindLoc (Let pat value)) -> do
+      binds' <- forM binds $ \(Let pat value) -> do
          value' <- resolveExprAt scope' imps value
-         pure $ Located bindLoc (Let (resolvePattern pat) value')
+         pure $ Let (resolvePattern pat) value'
       body' <- resolveExprAt scope' imps body
-      pure $ ExpLetIn (ResolvedInfo Nothing) (LetIn binds' body')
+      pure $ ExpLetIn (ResolvedInfo loc Nothing) (LetIn binds' body')
 
-   ExpIfThen _ (IfThenElse cond tr fl) -> do
+   ExpIfThen (ParsedInfo loc) (IfThenElse cond tr fl) -> do
       cond' <- resolveExprAt scope imps cond
       tr' <- resolveExprAt scope imps tr
       fl' <- resolveExprAt scope imps fl
-      pure $ ExpIfThen (ResolvedInfo Nothing) (IfThenElse cond' tr' fl')
+      pure $ ExpIfThen (ResolvedInfo loc Nothing) (IfThenElse cond' tr' fl')
 
-   ExpMatch _ (Match mtExp mtMatches) -> do
+   ExpMatch (ParsedInfo loc) (Match mtExp mtMatches) -> do
       mtExp' <- resolveExprAt scope imps mtExp
-      mtMatches' <- forM mtMatches $ \(MatchWing pat@(Located _ p) branch) -> do
-         patScope <- freshLocalScope (collectPatternVars p)
+      mtMatches' <- forM mtMatches $ \(MatchWing pat branch) -> do
+         patScope <- freshLocalScope (collectPatternVars pat)
          branch' <- resolveExprAt (M.union patScope scope) imps branch
          pure $ MatchWing (resolvePattern pat) branch'
-      pure $ ExpMatch (ResolvedInfo Nothing) (Match mtExp' mtMatches')
+      pure $ ExpMatch (ResolvedInfo loc Nothing) (Match mtExp' mtMatches')
 
-   ExpRecConstruct _ (RecConstruct rcBind rcCon rcAssigns) -> do
+   ExpRecConstruct (ParsedInfo loc) (RecConstruct rcBind rcCon rcAssigns) -> do
       rcAssigns' <- forM rcAssigns $ \(RecAssign fld value) -> do
          value' <- resolveExprAt scope imps value
          pure $ RecAssign fld value'
-      pure $ ExpRecConstruct (ResolvedInfo Nothing) (RecConstruct rcBind rcCon rcAssigns')
+      pure $ ExpRecConstruct (ResolvedInfo loc Nothing) (RecConstruct rcBind rcCon rcAssigns')
 
-   ExpRecUpdate _ (RecUpdate ruBase ruAssigns) -> do
+   ExpRecUpdate (ParsedInfo loc) (RecUpdate ruBase ruAssigns) -> do
       ruBase' <- resolveExprAt scope imps ruBase
       ruAssigns' <- forM ruAssigns $ \(RecAssign fld value) -> do
          value' <- resolveExprAt scope imps value
          pure $ RecAssign fld value'
-      pure $ ExpRecUpdate (ResolvedInfo Nothing) (RecUpdate ruBase' ruAssigns')
+      pure $ ExpRecUpdate (ResolvedInfo loc Nothing) (RecUpdate ruBase' ruAssigns')
 
-   ExpVarGetter _ baseExpr getter -> do
+   ExpVarGetter (ParsedInfo loc) baseExpr getter -> do
       baseExpr' <- resolveExprAt scope imps baseExpr
-      pure $ ExpVarGetter (ResolvedInfo Nothing) baseExpr' getter
+      pure $ ExpVarGetter (ResolvedInfo loc Nothing) baseExpr' getter
 
 -- #### Type checking ####
 
 typeCheck :: Program Resolved -> SemAnalyzer (Program Typed)
-typeCheck (Program mdl@(Located _ (ModuleDef m _)) imps stmts src) = do
+typeCheck (Program mdl@(ModuleDef _ m _) imps stmts src) = do
    modify $ \st -> st { currentModule = m }
    Program mdl imps <$> traverse (typeCheckStmt imps) stmts <-- src
 
 typeCheckStmt :: [Located ImportDef] -> Stmt Resolved -> SemAnalyzer (Stmt Typed)
-typeCheckStmt imps (StmtFunc (FnImpl (Located implLoc (FuncImpl fnIdent pats expr)))) = do
+typeCheckStmt imps (StmtFunc (FnImpl (FuncImpl implLoc fnIdent pats expr))) = do
    (FuncSig argTypes retType) <- fromJust <$> lookupCurrentFunction fnIdent
 
    -- 1) match patterns and args count
@@ -712,7 +713,7 @@ typeCheckStmt imps (StmtFunc (FnImpl (Located implLoc (FuncImpl fnIdent pats exp
       errSem (SEFnArityMismatch implLoc fnIdent (length argTypes) (length pats))
 
    -- 2) match patterns and args types
-   inferred <- zipWithM (inferPattern imps) argTypes (map getFnArgPat pats)
+   inferred <- zipWithM (inferPattern imps) argTypes pats
    let (pats', varMaps) = unzip inferred
    let patVars = M.unions varMaps
 
@@ -722,9 +723,9 @@ typeCheckStmt imps (StmtFunc (FnImpl (Located implLoc (FuncImpl fnIdent pats exp
    -- 4) compare types
    compareTypes implLoc retType (typeOf expr')
 
-   pure $ StmtFunc (FnImpl (Located implLoc (FuncImpl fnIdent (map FnArgPat pats') expr')))
+   pure $ StmtFunc (FnImpl (FuncImpl implLoc fnIdent pats' expr'))
 
-typeCheckStmt imps (StmtSystem (SysImpl (Located implLoc (SystemImpl sysIdent entPats mWith body)))) = do
+typeCheckStmt imps (StmtSystem (SysImpl (SystemImpl implLoc sysIdent entPats mWith body))) = do
    (SystemSig _ sigEnts sigRet sigWith) <- fromJust <$> lookupCurrentSystem sysIdent
 
    -- 1) match entity patterns and queried components count
@@ -765,7 +766,7 @@ typeCheckStmt imps (StmtSystem (SysImpl (Located implLoc (SystemImpl sysIdent en
    -- 4) compare types
    compareTypes implLoc sigRet (typeOf body')
 
-   pure $ StmtSystem (SysImpl (Located implLoc (SystemImpl sysIdent entPats' mWith' body')))
+   pure $ StmtSystem (SysImpl (SystemImpl implLoc sysIdent entPats' mWith' body'))
 
 typeCheckStmt _ (StmtFunc (FnDef def)) = pure $ StmtFunc (FnDef def)
 
@@ -849,7 +850,7 @@ zonkType s = go
       go t = t
 
 zonkTyped :: M.Map Int Type -> Typed -> Typed
-zonkTyped s (TypedInfo ty res) = TypedInfo (zonkType s ty) res
+zonkTyped s (TypedInfo loc ty res) = TypedInfo loc (zonkType s ty) res
 
 zonkProgram :: M.Map Int Type -> Program Typed -> Program Typed
 zonkProgram s = fmap (zonkTyped s)
@@ -917,35 +918,19 @@ substGnr m = \case
    TyFn args r   -> TyFn (map (substGnr m) args) (substGnr m r)
    t             -> t
 
-exprAnnotation :: Expr a -> a
-exprAnnotation = \case
-   ExpVar a _ _         -> a
-   ExpCon a _ _         -> a
-   ExpTuple a _         -> a
-   ExpList a _          -> a
-   ExpLit a _           -> a
-   ExpLambda a _        -> a
-   ExpApp a _ _         -> a
-   ExpLetIn a _         -> a
-   ExpMatch a _         -> a
-   ExpIfThen a _        -> a
-   ExpRecConstruct a _  -> a
-   ExpRecUpdate a _     -> a
-   ExpVarGetter a _ _   -> a
+typeOf :: Expr Typed -> Type
+typeOf = (.ty) . exprAnnotation
 
-typeOf :: Located (Expr Typed) -> Type
-typeOf = (.ty) . exprAnnotation . (.node)
-
-inferType 
-   :: [Located ImportDef] 
-   -> Located (Expr Resolved) 
-   -> SemAnalyzer (Located (Expr Typed))
-inferType imps (Located loc expr) = case expr of
-   ExpLit (ResolvedInfo mRes) literal -> do
+inferType
+   :: [Located ImportDef]
+   -> Expr Resolved
+   -> SemAnalyzer (Expr Typed)
+inferType imps expr = case expr of
+   ExpLit (ResolvedInfo loc mRes) literal -> do
       ty <- literalType literal
-      pure $ Located loc $ ExpLit (TypedInfo ty mRes) literal
+      pure $ ExpLit (TypedInfo loc ty mRes) literal
 
-   ExpVar (ResolvedInfo mRes) Nothing x -> do
+   ExpVar (ResolvedInfo loc mRes) Nothing x -> do
       thisSym <- lookupLocal x
       modSym  <- lookupCurrentModule x
       impSym  <- lookupUnqualifiedSymbol imps x
@@ -957,9 +942,9 @@ inferType imps (Located loc expr) = case expr of
             _ -> do
                errSem (SEUndefinedVar loc x)
                pure TyInvalid
-      pure $ Located loc $ ExpVar (TypedInfo ty mRes) Nothing x
+      pure $ ExpVar (TypedInfo loc ty mRes) Nothing x
 
-   ExpVar (ResolvedInfo mRes) (Just alias) x -> do
+   ExpVar (ResolvedInfo loc mRes) (Just alias) x -> do
       sym <- lookupQualifiedSymbol imps alias x
       ty <- case sym of
          Just (SymbolFn _ _ sig)       -> instantiate sig
@@ -967,9 +952,9 @@ inferType imps (Located loc expr) = case expr of
          _ -> do
             errSem (SEUndefinedVar loc x)
             pure TyInvalid
-      pure $ Located loc $ ExpVar (TypedInfo ty mRes) (Just alias) x
+      pure $ ExpVar (TypedInfo loc ty mRes) (Just alias) x
 
-   ExpCon (ResolvedInfo mRes) Nothing x -> do
+   ExpCon (ResolvedInfo loc mRes) Nothing x -> do
       modCon <- lookupCurrentConstructor x
       impCon <- lookupUnqualifiedConstructor imps x
       ty <- case modCon <|> impCon of
@@ -977,59 +962,59 @@ inferType imps (Located loc expr) = case expr of
          Nothing  -> do
             errSem (SEUndefinedCon loc x)
             pure TyInvalid
-      pure $ Located loc $ ExpCon (TypedInfo ty mRes) Nothing x
+      pure $ ExpCon (TypedInfo loc ty mRes) Nothing x
 
-   ExpCon (ResolvedInfo mRes) (Just alias) x -> do
+   ExpCon (ResolvedInfo loc mRes) (Just alias) x -> do
       con <- lookupQualifiedConstructor imps alias x
       ty <- case con of
          Just sym -> ctorType loc sym
          Nothing  -> do
             errSem (SEUndefinedCon loc x)
             pure TyInvalid
-      pure $ Located loc $ ExpCon (TypedInfo ty mRes) (Just alias) x
+      pure $ ExpCon (TypedInfo loc ty mRes) (Just alias) x
 
-   ExpApp (ResolvedInfo mRes) applicant operand -> do
+   ExpApp (ResolvedInfo loc mRes) applicant operand -> do
       applicant' <- inferType imps applicant
       operand'   <- inferType imps operand
       ty <- applyTypes loc (typeOf applicant') (typeOf operand')
-      pure $ Located loc $ ExpApp (TypedInfo ty mRes) applicant' operand'
+      pure $ ExpApp (TypedInfo loc ty mRes) applicant' operand'
 
-   ExpTuple (ResolvedInfo mRes) xs -> do
+   ExpTuple (ResolvedInfo loc mRes) xs -> do
       xs' <- mapM (inferType imps) xs
-      pure $ Located loc $ ExpTuple (TypedInfo (TyTuple (map typeOf xs')) mRes) xs'
+      pure $ ExpTuple (TypedInfo loc (TyTuple (map typeOf xs')) mRes) xs'
 
-   ExpList (ResolvedInfo mRes) [] -> do
+   ExpList (ResolvedInfo loc mRes) [] -> do
       ty <- TyApp (TyCon (Ident "List")) <$> freshTyVar
-      pure $ Located loc $ ExpList (TypedInfo ty mRes) []
+      pure $ ExpList (TypedInfo loc ty mRes) []
 
-   ExpList (ResolvedInfo mRes) (x:xs) -> do
+   ExpList (ResolvedInfo loc mRes) (x:xs) -> do
       x' <- inferType imps x
       xs' <- mapM (inferType imps) xs
       -- Check inner list types
       forM_ xs' $ \other ->
          unless (typeOf x' == typeOf other) $
-            errSem (SEListElementTypeMismatch x'.location (typeOf x') other.location (typeOf other))
+            errSem (SEListElementTypeMismatch (exprAnnotation x').location (typeOf x') (exprAnnotation other).location (typeOf other))
       -- Type of list is defined as `List a`,
       -- where a is a type of the first element
       let ty = TyApp (TyCon (Ident "List")) (typeOf x')
-      pure $ Located loc $ ExpList (TypedInfo ty mRes) (x':xs')
+      pure $ ExpList (TypedInfo loc ty mRes) (x':xs')
 
-   ExpIfThen (ResolvedInfo mRes) (IfThenElse if' then' else') -> do
+   ExpIfThen (ResolvedInfo loc mRes) (IfThenElse if' then' else') -> do
       -- Compare `if` type with Bool
       if'' <- inferType imps if'
-      compareTypes if''.location (typeOf if'') boolType
+      compareTypes (exprAnnotation if'').location (typeOf if'') boolType
       -- Compare `then` and `else` types
       then'' <- inferType imps then'
       else'' <- inferType imps else'
-      compareThenElse then''.location (typeOf then'') else''.location (typeOf else'')
+      compareThenElse (exprAnnotation then'').location (typeOf then'') (exprAnnotation else'').location (typeOf else'')
       -- Type of the whole expr is the type of the `then` block
-      pure $ Located loc $ ExpIfThen (TypedInfo (typeOf then'') mRes) (IfThenElse if'' then'' else'')
+      pure $ ExpIfThen (TypedInfo loc (typeOf then'') mRes) (IfThenElse if'' then'' else'')
 
-   ExpLetIn (ResolvedInfo mRes) (LetIn binds body) -> do
+   ExpLetIn (ResolvedInfo loc mRes) (LetIn binds body) -> do
       (binds', body') <- typeLetBinds imps binds body
-      pure $ Located loc $ ExpLetIn (TypedInfo (typeOf body') mRes) (LetIn binds' body')
+      pure $ ExpLetIn (TypedInfo loc (typeOf body') mRes) (LetIn binds' body')
 
-   ExpMatch (ResolvedInfo mRes) (Match mtExp mtMatches) -> do
+   ExpMatch (ResolvedInfo loc mRes) (Match mtExp mtMatches) -> do
       mtExp' <- inferType imps mtExp
       wings <- forM mtMatches $ \(MatchWing pat branch) -> do
          (pat', patVars) <- inferPattern imps (typeOf mtExp') pat
@@ -1040,9 +1025,9 @@ inferType imps (Located loc expr) = case expr of
          ((_, t):rest) -> do
             forM_ rest (unify loc t . snd)
             resolve t
-      pure $ Located loc $ ExpMatch (TypedInfo ty mRes) (Match mtExp' (map fst wings))
+      pure $ ExpMatch (TypedInfo loc ty mRes) (Match mtExp' (map fst wings))
 
-   ExpLambda (ResolvedInfo mRes) (Lambda args body) -> do
+   ExpLambda (ResolvedInfo loc mRes) (Lambda args body) -> do
       argTyVars <- forM args $ const freshTyVar
       inferred  <- zipWithM (inferPattern imps) argTyVars args
       let (args', argVarMaps) = unzip inferred
@@ -1052,9 +1037,9 @@ inferType imps (Located loc expr) = case expr of
 
       argTyVars' <- mapM resolve argTyVars
       let ty = TyFn argTyVars' (typeOf body')
-      pure $ Located loc $ ExpLambda (TypedInfo ty mRes) (Lambda args' body')
+      pure $ ExpLambda (TypedInfo loc ty mRes) (Lambda args' body')
 
-   ExpRecConstruct (ResolvedInfo mRes) (RecConstruct rcBind rcCon rcAssigns) -> do
+   ExpRecConstruct (ResolvedInfo loc mRes) (RecConstruct rcBind rcCon rcAssigns) -> do
       sym <- case rcBind of
          Nothing -> do
             modCon <- lookupCurrentConstructor rcCon
@@ -1084,9 +1069,9 @@ inferType imps (Located loc expr) = case expr of
                pure $ RecAssign fldName value'
             pure (TyInvalid, assigns')
 
-      pure $ Located loc $ ExpRecConstruct (TypedInfo ty mRes) (RecConstruct rcBind rcCon rcAssigns')
+      pure $ ExpRecConstruct (TypedInfo loc ty mRes) (RecConstruct rcBind rcCon rcAssigns')
 
-   ExpRecUpdate (ResolvedInfo mRes) (RecUpdate ruBase ruAssigns) -> do
+   ExpRecUpdate (ResolvedInfo loc mRes) (RecUpdate ruBase ruAssigns) -> do
       ruBase' <- inferType imps ruBase
       baseTy  <- resolve (typeOf ruBase')
       fields  <- recordFieldsOf imps loc baseTy
@@ -1101,9 +1086,9 @@ inferType imps (Located loc expr) = case expr of
             Nothing -> pure ()
          pure $ RecAssign fldName value'
 
-      pure $ Located loc $ ExpRecUpdate (TypedInfo baseTy mRes) (RecUpdate ruBase' ruAssigns')
+      pure $ ExpRecUpdate (TypedInfo loc baseTy mRes) (RecUpdate ruBase' ruAssigns')
 
-   ExpVarGetter (ResolvedInfo mRes) baseExpr getter -> do
+   ExpVarGetter (ResolvedInfo loc mRes) baseExpr getter -> do
       baseExpr' <- inferType imps baseExpr
       baseTy    <- resolve (typeOf baseExpr')
       ty <- case getter of
@@ -1120,7 +1105,7 @@ inferType imps (Located loc expr) = case expr of
             TyTuple tys | idx >= 0 && idx < length tys -> pure (tys !! idx)
             _ -> errSem (SEInvalidTupleIndex loc baseTy idx) >> pure TyInvalid
 
-      pure $ Located loc $ ExpVarGetter (TypedInfo ty mRes) baseExpr' getter
+      pure $ ExpVarGetter (TypedInfo loc ty mRes) baseExpr' getter
 
 recordFieldsOf :: [Located ImportDef] -> Location -> Type -> SemAnalyzer (Maybe (Ident, [Ident], [Type]))
 recordFieldsOf imps loc ty = case typeHead ty of
@@ -1158,56 +1143,56 @@ typeHead = \case
 
 typeLetBinds
    :: [Located ImportDef]
-   -> [Located (Let Resolved)]
-   -> Located (Expr Resolved)
-   -> SemAnalyzer ([Located (Let Typed)], Located (Expr Typed))
+   -> [Let Resolved]
+   -> Expr Resolved
+   -> SemAnalyzer ([Let Typed], Expr Typed)
 typeLetBinds imps [] body = ([],) <$> inferType imps body
-typeLetBinds imps (Located bindLoc (Let pat value) : rest) body = do
+typeLetBinds imps (Let pat value : rest) body = do
    value'  <- inferType imps value
    (pat', patVars) <- inferPattern imps (typeOf value') pat
    (rest', body') <- withVars patVars (typeLetBinds imps rest body)
-   pure (Located bindLoc (Let pat' value') : rest', body')
+   pure (Let pat' value' : rest', body')
 
 inferPattern
    :: [Located ImportDef]
    -> Type
-   -> Located (Pattern Resolved)
-   -> SemAnalyzer (Located (Pattern Typed), M.Map Ident VarInfo)
-inferPattern imps ty (Located loc p) = case p of
-   PatVar (ResolvedInfo mRes) x -> do
+   -> Pattern Resolved
+   -> SemAnalyzer (Pattern Typed, M.Map Ident VarInfo)
+inferPattern imps ty p = case p of
+   PatVar (ResolvedInfo loc mRes) x -> do
       vid <- freshVarId
-      pure (Located loc (PatVar (TypedInfo ty mRes) x), M.singleton x (VarInfo ty vid))
+      pure (PatVar (TypedInfo loc ty mRes) x, M.singleton x (VarInfo ty vid))
 
-   PatWildcard (ResolvedInfo mRes) ->
-      pure (Located loc (PatWildcard (TypedInfo ty mRes)), M.empty)
+   PatWildcard (ResolvedInfo loc mRes) ->
+      pure (PatWildcard (TypedInfo loc ty mRes), M.empty)
 
-   PatLit (ResolvedInfo mRes) lit -> do
+   PatLit (ResolvedInfo loc mRes) lit -> do
       litTy <- literalType lit
       unify loc ty litTy
-      pure (Located loc (PatLit (TypedInfo ty mRes) lit), M.empty)
+      pure (PatLit (TypedInfo loc ty mRes) lit, M.empty)
 
-   PatList (ResolvedInfo mRes) ps -> do
+   PatList (ResolvedInfo loc mRes) ps -> do
       elemTv <- freshTyVar
       unify loc ty (TyApp (TyCon (Ident "List")) elemTv)
       inferred <- mapM (inferPattern imps elemTv) ps
       let (ps', varMaps) = unzip inferred
-      pure (Located loc (PatList (TypedInfo ty mRes) ps'), M.unions varMaps)
+      pure (PatList (TypedInfo loc ty mRes) ps', M.unions varMaps)
 
-   PatTuple (ResolvedInfo mRes) ps -> do
+   PatTuple (ResolvedInfo loc mRes) ps -> do
       elemTvs <- mapM (const freshTyVar) ps
       unify loc ty (TyTuple elemTvs)
       inferred <- zipWithM (inferPattern imps) elemTvs ps
       let (ps', varMaps) = unzip inferred
-      pure (Located loc (PatTuple (TypedInfo ty mRes) ps'), M.unions varMaps)
+      pure (PatTuple (TypedInfo loc ty mRes) ps', M.unions varMaps)
 
-   PatCon (ResolvedInfo mRes) ctorIdent ps -> do
+   PatCon (ResolvedInfo loc mRes) ctorIdent ps -> do
       modCtor <- lookupCurrentConstructor ctorIdent
       impCtor <- lookupUnqualifiedConstructor imps ctorIdent
       case modCtor <|> impCtor of
          Nothing -> do
             inferred <- mapM (inferPattern imps TyInvalid) ps
             let ps' = map fst inferred
-            pure (Located loc (PatCon (TypedInfo TyInvalid mRes) ctorIdent ps'), M.empty)
+            pure (PatCon (TypedInfo loc TyInvalid mRes) ctorIdent ps', M.empty)
 
          Just sym@(SymbolCtor _ _ _) -> do
             resultTy <- ctorType loc sym
@@ -1222,11 +1207,11 @@ inferPattern imps ty (Located loc p) = case p of
                   errSem (SECtorArityMismatch loc ctorIdent (length expectedFieldTys) (length ps))
                   inferred <- mapM (inferPattern imps TyInvalid) ps
                   let ps' = map fst inferred
-                  pure (Located loc (PatCon (TypedInfo ctorResultTy mRes) ctorIdent ps'), M.empty)
+                  pure (PatCon (TypedInfo loc ctorResultTy mRes) ctorIdent ps', M.empty)
                else do
                   inferred <- zipWithM (inferPattern imps) expectedFieldTys ps
                   let (ps', varMaps) = unzip inferred
-                  pure (Located loc (PatCon (TypedInfo ctorResultTy mRes) ctorIdent ps'), M.unions varMaps)
+                  pure (PatCon (TypedInfo loc ctorResultTy mRes) ctorIdent ps', M.unions varMaps)
 
          Just invalid ->
             unreachableWith $ "Invalid constructor symbol at " ++ show loc ++ ": " ++ show invalid
@@ -1323,19 +1308,77 @@ boolType = TyCon (Ident "Bool")
 
 -- #### Desugaring ####
 
-desugarProgram :: Program Typed -> SemAnalyzer (Program Typed)
+desugarProgram :: Program Typed -> SemAnalyzer (Program Desugared)
 desugarProgram prog = do
+   let notImpl = [desugaredAnn <$> x | x <- prog.stmts, not (isNotImpl x)]
+
    -- Functions
-   let fmImpls = [x | StmtFunc (FnImpl (Located _ x)) <- prog.stmts]
+   let fmImpls = [x | StmtFunc (FnImpl x) <- prog.stmts]
    let fnGroups =
          groupBy ((==) `on` (.name))
             $ sortOn (.name) fmImpls
+   desugaredFns <- forM fnGroups desugarFn
 
-   desugared <- forM fnGroups $ \group -> do
-      let fstImpl = head group
-      let pats = map (\i -> map ((.node) . getFnArgPat) i.args) group
-      let match = Match
+   -- Systems
+   let sysImpls = [x | StmtSystem (SysImpl x) <- prog.stmts]
+   let sysGroups =
+         groupBy ((==) `on` (.name))
+            $ sortOn (.name) sysImpls
+   desugaredSystems <- forM sysGroups desugarSys
 
-      return $ FuncImpl fstImpl.name
+   -- Combine stmts
+   let combinedStmts = notImpl 
+         <> fmap (StmtFunc . FnImpl) desugaredFns
+         <> fmap (StmtSystem . SysImpl) desugaredSystems
 
-   undefined
+   return $ Program
+      prog.moduleDef
+      prog.imports
+      combinedStmts
+      prog.src
+
+desugarFn :: [FuncImpl Typed] -> SemAnalyzer (FuncImpl Desugared)
+desugarFn group = do
+   let fstImpl = head group
+   let argTypes = map ((.ty) . patAnnotation) fstImpl.args
+
+   -- Tuple patterns and bodies
+   let tupleAnn = DesugaredInfo {res = Nothing, ty = TyTuple argTypes}
+   let patBodies = flip map group $ \i ->
+         ( PatTuple tupleAnn $ map (fmap desugaredAnn) i.args
+         , fmap desugaredAnn i.body
+         )
+
+   -- Define args names
+   let argsCnt = length fstImpl.args
+   args <- forM [0..argsCnt] $ const freshParam
+   let (ids, names) = unzip args
+   let typedArgs = zip3 ids names argTypes
+
+   -- Base expression
+   let baseExpr = ExpTuple tupleAnn $ flip map typedArgs $ \(lid, name, ty) ->
+         ExpVar DesugaredInfo {res = Just (ResLocal lid), ty = ty} Nothing name
+
+   -- Generate match
+   let matchExpr = Match baseExpr $ map (uncurry MatchWing) patBodies
+   let retType = (exprAnnotation (snd (head patBodies))).ty
+
+   -- Construct new func impl
+   return $ FuncImpl
+      fstImpl.location
+      fstImpl.name
+      (map fst patBodies)
+      (ExpMatch DesugaredInfo {res = Nothing, ty = retType} matchExpr)
+
+desugarSys :: [SystemImpl Typed] -> SemAnalyzer (SystemImpl Desugared)
+desugarSys group = undefined
+
+freshParam :: SemAnalyzer (LocalId, Ident)
+freshParam = do
+   lid@(LocalId n) <- freshLocalId
+   pure (lid, Ident ("p_" <> T.pack (show n)))
+
+isNotImpl :: Stmt a -> Bool
+isNotImpl (StmtFunc (FnImpl _)) = False
+isNotImpl (StmtSystem (SysImpl _)) = False
+isNotImpl _ = True

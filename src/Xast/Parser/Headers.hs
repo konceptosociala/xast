@@ -5,20 +5,20 @@ module Xast.Parser.Headers where
 import Text.Megaparsec (sepBy1, between, (<|>), choice, sepEndBy1)
 
 import Xast.Parser.Ident (typeIdent, fnIdent)
-import Xast.Parser.Common (Parser, symbol, located)
+import Xast.Parser.Common (Parser, symbol, located, withLoc)
 import Xast.AST
 
 module' :: Parser Module
 module' = Module <$> typeIdent `sepBy1` "."
 
-moduleDef :: Parser (Located ModuleDef)
-moduleDef = located $ do
+moduleDef :: Parser ModuleDef
+moduleDef = withLoc $ do
    _        <- symbol "module"
    name     <- module'
    _        <- symbol "exports"
    export   <- located exportPayload
 
-   return ModuleDef {..}
+   return $ \location -> ModuleDef {..}
 
 exportPayload :: Parser ExportPayload
 exportPayload = choice

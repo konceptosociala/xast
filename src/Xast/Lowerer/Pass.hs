@@ -11,7 +11,7 @@ import Data.List (groupBy, sortOn)
 
 lowerProgram :: Program Typed -> Lowerer Kira
 lowerProgram prog = do
-   let systemImpls = [x | (StmtSystem (SysImpl (Located _ x))) <- prog.stmts]
+   let systemImpls = [x | StmtSystem (SysImpl x) <- prog.stmts]
    let systemGroups =
          groupBy ((==) `on` (.name))
             $ sortOn (.name) systemImpls
@@ -27,18 +27,18 @@ lowerProgram prog = do
       <-- ()
 
 lowerSystem :: SystemImpl Typed -> Lowerer KirSystem
-lowerSystem (SystemImpl name [EntityPattern pats] Nothing (Located _ _expr)) = do
+lowerSystem (SystemImpl _ name [EntityPattern pats] Nothing _expr) = do
    let kirSysName = KirName name.inner
    let kirSysBindings = map patToBinding pats
    let kirSysBody = todo__ "system body lowering is not implemented"
 
    return KirSystem {..}
 
-lowerSystem (SystemImpl _ _ (Just _) _) = todo__ "`with` entities are not supported"
-lowerSystem (SystemImpl _ _notOne _ _) =  todo__ "0 or 2+ entities are not supported"
+lowerSystem (SystemImpl _ _ _ (Just _) _) = todo__ "`with` entities are not supported"
+lowerSystem (SystemImpl _ _ _notOne _ _) =  todo__ "0 or 2+ entities are not supported"
 
 patToBinding :: EntPatBinding Typed -> KirBinding
-patToBinding (EntPatBinding (Located _ pat) access) =
+patToBinding (EntPatBinding pat access) =
    KirBinding
       { kirBindType   = patType pat
       , kirBindSrc    = SrcEntity

@@ -20,8 +20,8 @@ system = do
       then SysDef <$> systemDef
       else (SysDef <$> systemDef) <-> (SysImpl <$> systemImpl)
 
-systemDef :: Parser (Located SystemDef)
-systemDef = located $ do
+systemDef :: Parser SystemDef
+systemDef = withLoc $ do
    modifiers   <- many sysModifier
    _           <- symbol "system"
    name        <- typeIdent
@@ -32,7 +32,7 @@ systemDef = located $ do
 
    _        <- endOfStmt
 
-   return SystemDef {..}
+   return $ \location -> SystemDef {..}
 
 queriedEntity :: Parser QueriedEntity
 queriedEntity = QueriedEntity <$> 
@@ -47,8 +47,8 @@ with' = symbol "with" *> (withType `sepBy1` symbol ",")
          , WithRes   <$ symbol "res" <* symbol ":" <*> type'
          ]
 
-systemImpl :: Parser (Located (SystemImpl Parsed))
-systemImpl = located $ do
+systemImpl :: Parser (SystemImpl Parsed)
+systemImpl = withLoc $ do
    _           <- symbol "system"
    name        <- typeIdent
    entities    <- many entityPattern
@@ -57,7 +57,7 @@ systemImpl = located $ do
    body        <- expr
    _           <- endOfStmt
 
-   return SystemImpl {..}
+   return $ \location -> SystemImpl {..}
 
 entityPattern :: Parser (EntityPattern Parsed)
 entityPattern = between (symbol "#(") (symbol ")") $

@@ -6,13 +6,13 @@ import Data.Function ((&))
 import Text.Megaparsec (choice, sepBy, between, some, MonadParsec (try), many, sepBy1, sepEndBy)
 
 import Xast.Parser.Ident
-import Xast.Parser.Common (Parser, symbol, lexeme, endOfStmt, located)
+import Xast.Parser.Common (Parser, symbol, lexeme, endOfStmt, withLoc)
 import Xast.AST
 import Data.List (foldl1')
 import Xast.Parser.Modifier (typeModifier)
 
-typeDef :: Parser (Located TypeDef)
-typeDef = located $ do
+typeDef :: Parser TypeDef
+typeDef = withLoc $ do
    modifiers   <- many typeModifier
    _           <- symbol "type"
    name        <- typeIdent
@@ -21,13 +21,13 @@ typeDef = located $ do
    ctors       <- ctor `sepBy1` symbol "|"
    _           <- endOfStmt
 
-   return TypeDef {..}
+   return $ \location -> TypeDef {..}
 
-ctor :: Parser (Located Ctor)
-ctor = located $ do
+ctor :: Parser Ctor
+ctor = withLoc $ do
    name    <- typeIdent
    payload <- payload'
-   return Ctor {..}
+   return $ \location -> Ctor {..}
 
 payload' :: Parser Payload
 payload' = choice

@@ -14,8 +14,8 @@ import Xast.Parser.Modifier (fnModifier)
 func :: Parser (Func Parsed)
 func = (FnDef <$> funcDef) <-> (FnImpl <$> funcImpl)
 
-funcDef :: Parser (Located FuncDef)
-funcDef = located $ do
+funcDef :: Parser FuncDef
+funcDef = withLoc $ do
    modifiers   <- many fnModifier
    _           <- symbol "fn"
    name        <- fnIdent
@@ -24,15 +24,15 @@ funcDef = located $ do
    retType     <- type'
    _           <- endOfStmt
 
-   return FuncDef {..}
+   return $ \location -> FuncDef {..}
 
-funcImpl :: Parser (Located (FuncImpl Parsed))
-funcImpl = located $ do
+funcImpl :: Parser (FuncImpl Parsed)
+funcImpl = withLoc $ do
    _        <- symbol "fn"
    name     <- fnIdent
-   args     <- many (FnArgPat <$> atomPattern')
+   args     <- many atomPattern'
    _        <- symbol "="
    body     <- expr
    _        <- endOfStmt
 
-   return FuncImpl {..}
+   return $ \location -> FuncImpl {..}

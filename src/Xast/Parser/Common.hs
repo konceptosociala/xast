@@ -20,6 +20,14 @@ located p = do
    offset2 <- getOffset
    pure $ Located (Location pos offset1 (offset2 - offset1)) node
 
+withLoc :: Parser (Location -> a) -> Parser a
+withLoc p = do
+   offset1 <- getOffset
+   pos <- getSourcePos
+   f <- p
+   offset2 <- getOffset
+   pure $ f (Location pos offset1 (offset2 - offset1))
+
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc
 

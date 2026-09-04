@@ -7,13 +7,13 @@ import Text.Megaparsec (sepBy, between, many)
 import Xast.AST
 import Xast.Parser.Type (type')
 import Xast.Parser.Ident
-import Xast.Parser.Common (endOfStmt, Parser, symbol, (<->), located)
+import Xast.Parser.Common (endOfStmt, Parser, symbol, (<->), withLoc)
 
 extern :: Parser Extern
 extern = (ExtFunc <$> externFunc) <-> (ExtType <$> externType)
 
-externFunc :: Parser (Located ExternFunc)
-externFunc = located $ do
+externFunc :: Parser ExternFunc
+externFunc = withLoc $ do
    _        <- symbol "extern"
    _        <- symbol "fn"
    name     <- fnIdent
@@ -22,14 +22,14 @@ externFunc = located $ do
    retType  <- type'
    _        <- endOfStmt
 
-   return ExternFunc {..}
+   return $ \location -> ExternFunc {..}
 
-externType :: Parser (Located ExternType)
-externType = located $ do
+externType :: Parser ExternType
+externType = withLoc $ do
    _           <- symbol "extern"
    _           <- symbol "type"
    name        <- typeIdent
    generics    <- many genericIdent
    _           <- endOfStmt
 
-   return ExternType {..}
+   return $ \location -> ExternType {..}

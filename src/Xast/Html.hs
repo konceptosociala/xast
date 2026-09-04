@@ -115,16 +115,16 @@ raw = RawHtml
 
 -- #### TYPED AST RENDERING ####
 
-collectTokens :: Located (Expr Typed) -> [(Location, Type)]
-collectTokens (Located loc node) = case node of
+collectTokens :: Expr Typed -> [(Location, Type)]
+collectTokens node = case node of
    ExpVar info _ _ ->
-      [(loc, info.ty)]
+      [(info.location, info.ty)]
 
    ExpCon info _ _ ->
-      [(loc, info.ty)]
+      [(info.location, info.ty)]
 
    ExpLit info _ ->
-      [(loc, info.ty)]
+      [(info.location, info.ty)]
 
    ExpTuple _ xs ->
       concatMap collectTokens xs
@@ -139,7 +139,7 @@ collectTokens (Located loc node) = case node of
       collectTokens f ++ collectTokens x
 
    ExpLetIn _ (LetIn binds bodyExpr) ->
-      concatMap (\(Located _ (Let pat value)) -> collectPatternTokens pat ++ collectTokens value) binds
+      concatMap (\(Let pat value) -> collectPatternTokens pat ++ collectTokens value) binds
          ++ collectTokens bodyExpr
 
    ExpMatch _ (Match scrut wings) ->
@@ -157,16 +157,16 @@ collectTokens (Located loc node) = case node of
    ExpVarGetter _ e _ ->
       collectTokens e
 
-collectPatternTokens :: Located (Pattern Typed) -> [(Location, Type)]
-collectPatternTokens (Located loc node) = case node of
+collectPatternTokens :: Pattern Typed -> [(Location, Type)]
+collectPatternTokens node = case node of
    PatVar info _ ->
-      [(loc, info.ty)]
+      [(info.location, info.ty)]
 
    PatWildcard info ->
-      [(loc, info.ty)]
+      [(info.location, info.ty)]
 
    PatLit info _ ->
-      [(loc, info.ty)]
+      [(info.location, info.ty)]
 
    PatList _ ps ->
       concatMap collectPatternTokens ps
@@ -182,10 +182,10 @@ collectProgramTokens (Program _ _ stmts _) = concatMap collectStmtTokens stmts
 
 collectStmtTokens :: Stmt Typed -> [(Location, Type)]
 collectStmtTokens = \case
-   StmtFunc (FnImpl (Located _ (FuncImpl _ pats funcBody))) ->
+   StmtFunc (FnImpl (FuncImpl _ _ pats funcBody)) ->
       concatMap collectPatternTokens pats ++ collectTokens funcBody
 
-   StmtSystem (SysImpl (Located _ (SystemImpl _ entPats mWith sysBody))) ->
+   StmtSystem (SysImpl (SystemImpl _ _ entPats mWith sysBody)) ->
       concatMap (\(EntityPattern bindings) -> concatMap (collectPatternTokens . (.pat)) bindings) entPats
          ++ maybe [] (concatMap collectPatternTokens) mWith
          ++ collectTokens sysBody
@@ -213,7 +213,7 @@ renderSourceWithTokens src tokens = go 0 (sortOn ((.offset) . fst) tokens)
 tokenSpan :: Text -> Text -> Html
 tokenSpan tokTxt ty = span_ [("class", "tok"), ("data-type", ty), ("tabindex", "0")] [text tokTxt]
 
-renderTypedSource :: Text -> Located (Expr Typed) -> Html
+renderTypedSource :: Text -> Expr Typed -> Html
 renderTypedSource src expr = pre_ [("class", "code")] (renderSourceWithTokens src (collectTokens expr))
 
 renderTypedProgram :: Program Typed -> Html
