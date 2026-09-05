@@ -6,6 +6,11 @@ import qualified Data.Set as S
 
 import Xast.AST
 
+data AnalysisResult = AnalysisResult
+   { warningsCount :: Int
+   , progs         :: [Program Desugared]
+   }
+
 data Env = Env
    { vars      :: M.Map Ident VarInfo
    , functions :: M.Map Ident FuncSig 

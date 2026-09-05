@@ -34,7 +34,7 @@ fullAnalysis
    => ([SemWarning] -> m ())
    -> (FilePath -> String -> m ())
    -> [Program Parsed]
-   -> ExceptT [SemError] m Int
+   -> ExceptT [SemError] m AnalysisResult
 fullAnalysis reportWarnings saveFile progs = do
    let env = emptyEnv
        st0 = emptySymTable
@@ -65,9 +65,14 @@ fullAnalysis reportWarnings saveFile progs = do
    _ <- lift $ saveFile "index.html" (unpack txt)
    ---------------------------------
 
-   (progsDesugared1, st5, warns5) <- ExceptT $ pure $ runPhase env st4 (forM progsZonked desugarProgram)
+   (progsDesugared, st5, warns5) <- ExceptT $ pure $ runPhase env st4 (forM progsZonked desugarProgram)
 
-   return $ sum $ map length [warns1, warns2, warns3, warns4]
+   let warningsCount = sum $ map length [warns1, warns2, warns3, warns4]
+
+   return $ AnalysisResult
+      { warningsCount = warningsCount
+      , progs = progsDesugared
+      }
 
 -- #### DECLARE STATEMENTS ####
 
@@ -445,7 +450,7 @@ resolveNames (Program md@(ModuleDef _ m _) imps stmts src) = do
       StmtFunc (FnImpl (FuncImpl implLoc fnIdent args body)) -> do
          scope <- freshLocalScope (foldMap collectPatternVars args)
          body' <- resolveExprAt scope imps body
-         let args' = map resolvePattern args
+         let args' = map (resolvePattern scope) args
          pure $ StmtFunc (FnImpl (FuncImpl implLoc fnIdent args' body'))
 
       StmtSystem (SysImpl (SystemImpl implLoc sysIdent entPats mWith body)) -> do
@@ -457,8 +462,8 @@ resolveNames (Program md@(ModuleDef _ m _) imps stmts src) = do
          let sigEnts = maybe [] (.entities) sig
              sigRet  = maybe TyInvalid (.retType) sig
              sigEnts' = map Just sigEnts ++ repeat Nothing
-         let entPats' = zipWith (resolveEntityPattern sigRet) sigEnts' entPats
-         let mWith' = fmap (map resolvePattern) mWith
+         let entPats' = zipWith (resolveEntityPattern entScope sigRet) sigEnts' entPats
+         let mWith' = fmap (map (resolvePattern withScope)) mWith
          pure $ StmtSystem (SysImpl (SystemImpl implLoc sysIdent entPats' mWith' body'))
 
       StmtSystem (SysDef def) -> pure $ StmtSystem (SysDef def)
@@ -546,8 +551,20 @@ collectPatternVars = \case
    PatTuple _ ps -> foldMap collectPatternVars ps
    PatCon _ _ ps -> foldMap collectPatternVars ps
 
-resolvePattern :: Pattern Parsed -> Pattern Resolved
-resolvePattern = fmap (\(ParsedInfo loc) -> ResolvedInfo loc Nothing)
+resolvePattern :: M.Map Ident LocalId -> Pattern Parsed -> Pattern Resolved
+resolvePattern scope = \case
+   PatVar (ParsedInfo loc) x ->
+      PatVar (ResolvedInfo loc (ResLocal <$> M.lookup x scope)) x
+   PatWildcard (ParsedInfo loc) ->
+      PatWildcard (ResolvedInfo loc Nothing)
+   PatLit (ParsedInfo loc) lit ->
+      PatLit (ResolvedInfo loc Nothing) lit
+   PatList (ParsedInfo loc) ps ->
+      PatList (ResolvedInfo loc Nothing) (map (resolvePattern scope) ps)
+   PatTuple (ParsedInfo loc) ps ->
+      PatTuple (ResolvedInfo loc Nothing) (map (resolvePattern scope) ps)
+   PatCon (ParsedInfo loc) ident ps ->
+      PatCon (ResolvedInfo loc Nothing) ident (map (resolvePattern scope) ps)
 
 componentAccess :: Type -> Type -> BindingAccess
 componentAccess sysRet ty
@@ -563,8 +580,8 @@ typeContains needle haystack
       TyFn args r -> any (typeContains needle) args || typeContains needle r
       _           -> False
 
-resolveEntityPattern :: Type -> Maybe QueriedEntity -> EntityPattern Parsed -> EntityPattern Resolved
-resolveEntityPattern sysRet mEnt (EntityPattern bindings) =
+resolveEntityPattern :: M.Map Ident LocalId -> Type -> Maybe QueriedEntity -> EntityPattern Parsed -> EntityPattern Resolved
+resolveEntityPattern scope sysRet mEnt (EntityPattern bindings) =
    EntityPattern (zipWith bindOne tys bindings)
    where
       tys = case mEnt of
@@ -572,7 +589,7 @@ resolveEntityPattern sysRet mEnt (EntityPattern bindings) =
          Nothing                 -> repeat Nothing
 
       bindOne mTy (EntPatBinding pat _) =
-         EntPatBinding (resolvePattern pat) (maybe AccessRead (componentAccess sysRet) mTy)
+         EntPatBinding (resolvePattern scope pat) (maybe AccessRead (componentAccess sysRet) mTy)
 
 resolveExprAt
    :: M.Map Ident LocalId
@@ -648,7 +665,7 @@ resolveExpr scope imps expr = case expr of
    ExpLambda (ParsedInfo loc) (Lambda args body) -> do
       argScope <- freshLocalScope (foldMap collectPatternVars args)
       body' <- resolveExprAt (M.union argScope scope) imps body
-      let args' = map resolvePattern args
+      let args' = map (resolvePattern argScope) args
       pure $ ExpLambda (ResolvedInfo loc Nothing) (Lambda args' body')
 
    ExpApp (ParsedInfo loc) lhs rhs -> do
@@ -662,7 +679,7 @@ resolveExpr scope imps expr = case expr of
       let scope' = M.union bindScope scope
       binds' <- forM binds $ \(Let pat value) -> do
          value' <- resolveExprAt scope' imps value
-         pure $ Let (resolvePattern pat) value'
+         pure $ Let (resolvePattern bindScope pat) value'
       body' <- resolveExprAt scope' imps body
       pure $ ExpLetIn (ResolvedInfo loc Nothing) (LetIn binds' body')
 
@@ -677,7 +694,7 @@ resolveExpr scope imps expr = case expr of
       mtMatches' <- forM mtMatches $ \(MatchWing pat branch) -> do
          patScope <- freshLocalScope (collectPatternVars pat)
          branch' <- resolveExprAt (M.union patScope scope) imps branch
-         pure $ MatchWing (resolvePattern pat) branch'
+         pure $ MatchWing (resolvePattern patScope pat) branch'
       pure $ ExpMatch (ResolvedInfo loc Nothing) (Match mtExp' mtMatches')
 
    ExpRecConstruct (ParsedInfo loc) (RecConstruct rcBind rcCon rcAssigns) -> do
@@ -1310,7 +1327,7 @@ boolType = TyCon (Ident "Bool")
 
 desugarProgram :: Program Typed -> SemAnalyzer (Program Desugared)
 desugarProgram prog = do
-   let notImpl = [desugaredAnn <$> x | x <- prog.stmts, not (isNotImpl x)]
+   let notImpl = [desugaredAnn <$> x | x <- prog.stmts, isNotImpl x]
 
    -- Functions
    let fmImpls = [x | StmtFunc (FnImpl x) <- prog.stmts]

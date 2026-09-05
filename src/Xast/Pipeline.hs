@@ -6,7 +6,6 @@ import Control.Monad.Except
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import Data.Text (pack)
 import Data.List (dropWhileEnd)
-import Data.Bifunctor (Bifunctor(first))
 import Data.Either (partitionEithers)
 import System.Directory (getCurrentDirectory, doesFileExist)
 
@@ -15,10 +14,12 @@ import Xast.Error.Types (XastError (..))
 import Xast.Parser.Program (parseProgram)
 import Xast.AST
 import Xast.SemAnalyzer.Analysis (fullAnalysis)
+import Xast.SemAnalyzer.Types (AnalysisResult(..))
 import Xast.Error.Pretty (PrintError(printError), printWarnings)
 import Xast.Utils.Pretty
 import qualified Toml
 import Control.Monad.RWS (MonadTrans(lift))
+import Xast.Lowerer.Pass (lowerPrograms)
 
 runCompile :: Maybe FilePath -> IO ()
 runCompile dir = runCompile_ dir >>= \case
@@ -73,8 +74,16 @@ runCompile_ dir = runExceptT $ do
       throwError errors
 
    -- Semantic analysis
-   result <- runExceptT $ fullAnalysis  (lift . printWarnings) (\path content -> liftIO $ writeFile path content) programs
-   ExceptT $ pure $ first (map XastSemAnalyzeError) result
+   semResult <- runExceptT $ fullAnalysis  (lift . printWarnings) (\path content -> liftIO $ writeFile path content) programs
+   (warnings, progsAnalyzed) <- case semResult of
+      Left errs -> throwError (XastSemAnalyzeError <$> errs)
+      Right res -> return (res.warningsCount, res.progs)
+
+   let loweredIR = lowerPrograms progsAnalyzed
+   
+   liftIO $ print loweredIR
+
+   return warnings
 
 parseOne :: FilePath -> Module -> IO (Either XastError (Program Parsed))
 parseOne currentDir module_ = runExceptT $ do

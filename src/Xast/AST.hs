@@ -109,7 +109,7 @@ desugaredAnn :: Typed -> Desugared
 desugaredAnn ti = DesugaredInfo ti.ty ti.res
 
 newtype LocalId = LocalId Int
-   deriving (Eq, Show)
+   deriving (Eq, Ord, Show)
 newtype FunctionId = FunctionId Int
    deriving (Eq, Show)
 newtype ConstructorId = ConstructorId Int
