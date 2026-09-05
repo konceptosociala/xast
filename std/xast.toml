@@ -1,0 +1,11 @@
+[project]
+name    = "std"
+version = "0.1.0"
+author  = "Xast Platform"
+modules = [
+    "Test"
+]
+
+[api]
+labels = []
+components = []

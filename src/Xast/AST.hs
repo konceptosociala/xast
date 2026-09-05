@@ -425,7 +425,9 @@ data SystemImpl a = SystemImpl
    }
    deriving (Eq, Show, Functor, Foldable, Traversable)
 
-newtype EntityPattern a = EntityPattern [EntPatBinding a]
+newtype EntityPattern a = EntityPattern
+   { bindings :: [EntPatBinding a]
+   }
    deriving (Eq, Show, Functor, Foldable, Traversable)
 
 data EntPatBinding a = EntPatBinding

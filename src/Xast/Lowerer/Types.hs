@@ -27,6 +27,12 @@ data KirBlock = KirBlock
 data KirInstruct
    = KirCall KirName [KirValue] KirName
    | KirAssign KirBindingId KirValue
+   | KirMatch 
+      KirValue 
+      [(Literal, [KirInstruct], KirValue)] 
+      (Maybe ([KirInstruct], KirValue)) 
+      KirBindingId
+
 
 data KirTerm
    = KirReturn
@@ -34,6 +40,7 @@ data KirTerm
 data KirValue
    = KirConst Literal
    | KirVar KirName
+   | KirBindingRef KirBindingId
 
 newtype KirBindingId = KirBindingId Int
 

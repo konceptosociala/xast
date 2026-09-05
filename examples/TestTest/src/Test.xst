@@ -10,6 +10,10 @@ system Hello other = other + 1;
 -- static void Hello(ecs_iter_t *it) {
 --     int32_t *i = ecs_field(it, int32_t, 0);
 -- 
---     int32_t t0 = *i + 1;
+--     int32_t t0;
+--     switch (*i) {
+--         case 100: t = 0; break;
+--         default: t = *i + 1; break;
+--     };
 --     *i = t0;
 -- }
