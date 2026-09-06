@@ -11,26 +11,25 @@ import Xast.Parser.Ident (typeIdent)
 import Xast.Parser.Type (type')
 import Xast.Parser.Expr (expr, atomPattern')
 import Xast.AST
-import Xast.Parser.Modifier (sysModifier)
+import Xast.Parser.Modifier (sysModifier, noRepeatedModifiers)
 
 system :: Parser (System Parsed)
 system = do
-   hasLabel <- lookAhead (optional (symbol "@label"))
-   if isJust hasLabel
-      then SysDef <$> systemDef
-      else (SysDef <$> systemDef) <-> (SysImpl <$> systemImpl)
+   hasLabel  <- lookAhead (optional (symbol "@label"))
+   modifiers <- many sysModifier >>= noRepeatedModifiers
+   if isJust hasLabel || not (null modifiers)
+      then SysDef <$> systemDef modifiers
+      else (SysDef <$> systemDef modifiers) <-> (SysImpl <$> systemImpl)
 
-systemDef :: Parser SystemDef
-systemDef = withLoc $ do
-   modifiers   <- many sysModifier
+systemDef :: [Modifier] -> Parser SystemDef
+systemDef modifiers = withLoc $ do
    _           <- symbol "system"
    name        <- typeIdent
    entities    <- many queriedEntity
    _           <- symbol "->"
    retType     <- type'
    with        <- optional with'
-
-   _        <- endOfStmt
+   _           <- endOfStmt
 
    return $ \location -> SystemDef {..}
 

@@ -79,9 +79,13 @@ runCompile_ dir = runExceptT $ do
       Left errs -> throwError (XastSemAnalyzeError <$> errs)
       Right res -> return (res.warningsCount, res.progs)
 
+   -- Lowering AST into KIRA
    let loweredIR = lowerPrograms progsAnalyzed
    
+   -- Temporary printing IR
+   ------------------------
    liftIO $ print loweredIR
+   ------------------------
 
    return warnings
 

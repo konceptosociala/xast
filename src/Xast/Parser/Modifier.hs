@@ -1,58 +1,106 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 module Xast.Parser.Modifier where
 
 import Text.Megaparsec
+import qualified Data.Set as Set
 import Xast.Parser.Common (Parser, symbol)
-import Xast.AST (Modifier (..), FnModifier (..), ComponentDispatchMode (..), SysModifier (..), TypeModifier (..))
+import Xast.AST (Modifier (..), FnModifier (..), ComponentDispatchMode (..), SysModifier (..), TypeModifier (..), ExtFnModifier (ModIntrinsic), displayModifier)
 import Xast.Parser.Ident (fnIdent, typeIdent)
 import Xast.Parser.Expr (stringLiteral)
+
+failAt :: Int -> String -> Parser a
+failAt offset msg = region (const (FancyError offset (Set.singleton (ErrorFail msg)))) (fail msg)
 
 modifier :: Parser Modifier
 modifier = "@" *> choice
    [ FnMod <$> choice
-      [ ModSharedVariant   <$ "SharedVariant" <*> between (symbol "(") (symbol ")") fnIdent
-      , ModMemoize         <$ "Memoize"
-      , ModInline          <$ "Inline"
-      , ModDeprecated      <$ "Deprecated" <*> between (symbol "(") (symbol ")") fnIdent
+      [ ModSharedVariant   <$ symbol "SharedVariant" <*> between (symbol "(") (symbol ")") (fnIdent <?> "shared variant function name")
+      , ModMemoize         <$ symbol "Memoize"
+      , ModInline          <$ symbol "Inline"
+      , ModDeprecated      <$ symbol "Deprecated" <*> between (symbol "(") (symbol ")") (stringLiteral <?> "string literal")
+      , ModSupUnreachable  <$ symbol "SuppressUnreachable"
       ]
    , SysMod <$> choice
-      [ ModCompDispatchMode   <$ "Mode" <*> between (symbol "(") (symbol ")") compDispatchMode
-      , ModLabel              <$ "Label" <*> between (symbol "(") (symbol ")") typeIdent
-      , ModDebugName          <$ "DebugName" <*> between (symbol "(") (symbol ")") stringLiteral
-      , ModParallel           <$ "Parallel"
+      [ ModCompDispatchMode   <$ symbol "Mode" <*> between (symbol "(") (symbol ")") compDispatchMode
+      , ModLabel              <$ symbol "Label" <*> between (symbol "(") (symbol ")") (typeIdent <?> "CamelCase system pipeline label ident")
+      , ModParallel           <$ symbol "Parallel"
       ]
    , TypeMod <$> choice
-      [ ModSingleton       <$ "Singleton"
-      , ModCopyable        <$ "Copyable"
-      , ModTag             <$ "Tag"
-      , ModNonExhaustive   <$ "NonExhaustive"
+      [ ModSingleton       <$ symbol "Singleton"
+      , ModCopyable        <$ symbol "Copyable"
+      , ModTag             <$ symbol "Tag"
+      , ModNonExhaustive   <$ symbol "NonExhaustive"
+      ]
+   , ExtFnMod <$> choice
+      [ ModIntrinsic       <$ symbol "Intrinsic"
       ]
    ]
 
+extFnModifier :: Parser Modifier
+extFnModifier = do
+   start <- getOffset
+   modif <- modifier <?> "invalid modifier"
+   case modif of
+      ExtFnMod _ -> return modif
+      other -> failAt start $
+         "invalid extern function modifier used: " ++ displayModifier other
+
 fnModifier :: Parser Modifier
 fnModifier = do
+   start <- getOffset
    modif <- modifier <?> "invalid modifier"
    case modif of
       FnMod _ -> return modif
-      _ -> fail "invalid function modifier used"
+      other -> failAt start $ 
+         "invalid function modifier used: " ++ displayModifier other
 
 sysModifier :: Parser Modifier
 sysModifier = do
+   start <- getOffset
    modif <- modifier <?> "invalid modifier"
    case modif of
       SysMod _ -> return modif
-      _ -> fail "invalid system modifier used"
+      other -> failAt start $
+         "invalid system modifier used: " ++ displayModifier other
 
 typeModifier :: Parser Modifier
 typeModifier = do
+   start <- getOffset
    modif <- modifier <?> "invalid modifier"
    case modif of
       TypeMod _ -> return modif
-      _ -> fail "invalid type modifier used"
+      other -> failAt start $ 
+         "invalid type modifier used: " ++ displayModifier other
 
 compDispatchMode :: Parser ComponentDispatchMode
 compDispatchMode = choice
    [ CDMDynamic   <$ symbol "Dynamic"
    , CDMSafe      <$ symbol "Safe"
    , CDMStrict    <$ symbol "Strict"
-   ]
+   ] <?> "a valid component dispatch mode (Dynamic, Safe, or Strict)"
+
+modifierTag :: Modifier -> Int
+modifierTag = \case
+   FnMod (ModSharedVariant _)       -> 0
+   FnMod ModMemoize                 -> 1
+   FnMod ModInline                  -> 2
+   FnMod (ModDeprecated _)          -> 3
+   FnMod ModSupUnreachable          -> 4
+   SysMod (ModCompDispatchMode _)   -> 5
+   SysMod (ModLabel _)              -> 6
+   SysMod ModParallel               -> 7
+   TypeMod ModSingleton             -> 8
+   TypeMod ModCopyable              -> 9
+   TypeMod ModTag                   -> 10
+   TypeMod ModNonExhaustive         -> 11
+   ExtFnMod ModIntrinsic            -> 12
+
+-- | Fails the parse if any two modifiers in the list share a kind
+noRepeatedModifiers :: [Modifier] -> Parser [Modifier]
+noRepeatedModifiers mods = go [] mods
+   where
+      go _ [] = pure mods
+      go seen (m:rest)
+         | modifierTag m `elem` seen = fail ("modifier `" ++ displayModifier m ++ "` cannot be used more than once")
+         | otherwise = go (modifierTag m : seen) rest

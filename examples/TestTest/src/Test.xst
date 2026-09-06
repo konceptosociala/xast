@@ -3,6 +3,7 @@ module Test exports *
 extern type Int;
 extern fn opAdd(Int, Int) -> Int;
 
+@Mode(Strict)
 system Hello #(Int) -> Int;
 system Hello 100   = 0;
 system Hello other = other + 1;

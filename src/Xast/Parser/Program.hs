@@ -11,6 +11,7 @@ import Xast.Parser.Common (Parser, sc)
 import Xast.Parser.Headers (moduleDef, importDef)
 import Xast.Parser.System (system)
 import Xast.Parser.Extern
+import Xast.Parser.Modifier (modifier)
 import Xast.Error.Types (XastError (XastParseError))
 import Xast.AST
 
@@ -33,7 +34,10 @@ stmtKeyword = "extern" <|> "fn" <|> "type" <|> "system"
 
 stmt :: Parser (Stmt Parsed)
 stmt = do
-   tok <- lookAhead stmtKeyword
+   -- A statement may carry modifier annotations (`@Foo(...)`) before its
+   -- keyword; skip past any of those to find the keyword without consuming
+   -- anything — the chosen branch below re-parses the modifiers for real.
+   tok <- lookAhead (many modifier *> stmtKeyword)
    case tok of
       "extern" -> StmtExtern  <$> extern
       "fn"     -> StmtFunc    <$> func

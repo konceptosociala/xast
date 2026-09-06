@@ -138,6 +138,11 @@ opIdent op = case op of
    OpApply   -> Ident "opApply"
    OpConcat  -> Ident "opConcat"
    OpNeg     -> Ident "opNeg"
+   OpBitAnd  -> Ident "opBitwiseAnd"
+   OpBitOr   -> Ident "opBitwiseOr"
+   OpBitXor  -> Ident "opBitwiseXor"
+   OpShl     -> Ident "opShiftLeft"
+   OpShr     -> Ident "opShiftRight"
 
 opVar :: Location -> BuiltinOp -> Expr Parsed
 opVar loc = ExpVar (ParsedInfo loc) Nothing . opIdent
@@ -163,6 +168,11 @@ opToken op = case op of
    OpPipe    -> "|>"
    OpApply   -> "<|"
    OpConcat  -> "<>"
+   OpBitAnd  -> "&"
+   OpBitOr   -> "|"
+   OpBitXor  -> "^"
+   OpShl     -> "<<"
+   OpShr     -> ">>"
 
 opLen :: BuiltinOp -> Int
 opLen op = case op of
@@ -185,6 +195,11 @@ opLen op = case op of
    OpPipe    -> 2
    OpApply   -> 2
    OpConcat  -> 2
+   OpBitAnd  -> 1
+   OpBitOr   -> 1
+   OpBitXor  -> 1
+   OpShl     -> 2
+   OpShr     -> 2
 
 binOp :: Location -> BuiltinOp -> Expr Parsed -> Expr Parsed -> Expr Parsed
 binOp opLoc op a b =
@@ -214,13 +229,21 @@ table =
       , InfixL (binary OpMinus)
       ]
 
+   ,  [ InfixL (binary OpShl)
+      , InfixL (binary OpShr)
+      ]
+
    ,  [ InfixN (binary OpEq)
       , InfixN (binary OpNeq)
       , InfixN (binary OpLe)
       , InfixN (binary OpGe)
-      , InfixN (binaryGuarded OpLt "=|>")
-      , InfixN (binaryGuarded OpGt "=")
+      , InfixN (binaryGuarded OpLt "=|><")
+      , InfixN (binaryGuarded OpGt "=>")
       ]
+
+   ,  [ InfixL (binaryGuarded OpBitAnd "&") ]
+   ,  [ InfixL (binary OpBitXor) ]
+   ,  [ InfixL (binaryGuarded OpBitOr ">") ]
 
    ,  [ InfixR (binary OpAnd) ]
    ,  [ InfixR (binary OpOr) ]

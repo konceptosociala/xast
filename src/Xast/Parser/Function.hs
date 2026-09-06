@@ -9,14 +9,17 @@ import Xast.Parser.Ident (fnIdent)
 import Xast.Parser.Expr (expr, atomPattern')
 import Xast.Parser.Common
 import Xast.AST
-import Xast.Parser.Modifier (fnModifier)
+import Xast.Parser.Modifier (fnModifier, noRepeatedModifiers)
 
 func :: Parser (Func Parsed)
-func = (FnDef <$> funcDef) <-> (FnImpl <$> funcImpl)
+func = do
+   modifiers <- many fnModifier >>= noRepeatedModifiers
+   if null modifiers
+      then (FnDef <$> funcDef modifiers) <-> (FnImpl <$> funcImpl)
+      else FnDef <$> funcDef modifiers
 
-funcDef :: Parser FuncDef
-funcDef = withLoc $ do
-   modifiers   <- many fnModifier
+funcDef :: [Modifier] -> Parser FuncDef
+funcDef modifiers = withLoc $ do
    _           <- symbol "fn"
    name        <- fnIdent
    args        <- between (symbol "(") (symbol ")") (type' `sepBy` symbol ",")

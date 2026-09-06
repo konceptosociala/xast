@@ -21,6 +21,7 @@ pre.code { white-space: pre-wrap; font-size: 14px; line-height: 1.7; margin: 0; 
 extern type Int;
 extern fn opAdd(Int, Int) -&gt; Int;
 
+@Mode(Strict)
 system Hello #(Int) -&gt; Int;
 system Hello <span class="tok" data-type="Int" tabindex="0">100   </span>= <span class="tok" data-type="Int" tabindex="0">0</span>;
 system Hello <span class="tok" data-type="Int" tabindex="0">other </span>= <span class="tok" data-type="Int" tabindex="0">other </span><span class="tok" data-type="fn(Int, Int) -&gt; Int" tabindex="0">+</span> <span class="tok" data-type="Int" tabindex="0">1</span>;

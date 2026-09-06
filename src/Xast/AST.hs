@@ -26,23 +26,43 @@ data Location = Location
 sortLocByPos :: Location -> Location -> Ordering
 sortLocByPos a b = compare a.pos b.pos
 
+displayModifier :: Modifier -> String
+displayModifier = \case
+   FnMod (ModSharedVariant _)       -> "@SharedVariant"
+   FnMod ModMemoize                 -> "@Memoize"
+   FnMod ModInline                  -> "@Inline"
+   FnMod (ModDeprecated _)          -> "@Deprecated"
+   FnMod ModSupUnreachable          -> "@SuppressUnreachable"
+   SysMod (ModCompDispatchMode _)   -> "@Mode"
+   SysMod (ModLabel _)              -> "@Label"
+   SysMod ModParallel               -> "@Parallel"
+   TypeMod ModSingleton             -> "@Singleton"
+   TypeMod ModCopyable              -> "@Copyable"
+   TypeMod ModTag                   -> "@Tag"
+   TypeMod ModNonExhaustive         -> "@NonExhaustive"
+   ExtFnMod ModIntrinsic            -> "@Intrinsic"
 data Modifier 
    = FnMod FnModifier
    | SysMod SysModifier
    | TypeMod TypeModifier
+   | ExtFnMod ExtFnModifier
+   deriving (Eq, Show)
+
+data ExtFnModifier
+   = ModIntrinsic
    deriving (Eq, Show)
 
 data FnModifier
    = ModSharedVariant Ident
    | ModMemoize
    | ModInline
-   | ModDeprecated Ident
+   | ModDeprecated Text
+   | ModSupUnreachable
    deriving (Eq, Show)
 
 data SysModifier
    = ModCompDispatchMode ComponentDispatchMode
    | ModLabel Ident
-   | ModDebugName Text
    | ModParallel
    deriving (Eq, Show)
 
@@ -183,6 +203,12 @@ data BuiltinOp
    | OpPipe    -- |>
    | OpApply   -- <|
    | OpConcat  -- <>
+   -- Bitwise
+   | OpBitAnd  -- &
+   | OpBitOr   -- |
+   | OpBitXor  -- ^
+   | OpShl     -- <<
+   | OpShr     -- >>
    deriving (Eq, Show)
 
 data Match a = Match
