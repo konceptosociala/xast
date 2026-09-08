@@ -13,13 +13,15 @@ import Xast.Config (xastConfigCodec, projectConfig, modules)
 import Xast.Error.Types (XastError (..))
 import Xast.Parser.Program (parseProgram)
 import Xast.AST
-import Xast.SemAnalyzer.Analysis (fullAnalysis)
+import Xast.SemAnalyzer.Pass (fullAnalysis)
 import Xast.SemAnalyzer.Types (AnalysisResult(..))
 import Xast.Error.Pretty (PrintError(printError), printWarnings)
 import Xast.Utils.Pretty
 import qualified Toml
 import Control.Monad.RWS (MonadTrans(lift))
 import Xast.Lowerer.Pass (lowerPrograms)
+import Xast.Codegen.C.Types
+import Xast.Codegen.C.Pretty (prettyProgram)
 
 runCompile :: Maybe FilePath -> IO ()
 runCompile dir = runCompile_ dir >>= \case
@@ -86,6 +88,35 @@ runCompile_ dir = runExceptT $ do
    ------------------------
    liftIO $ print loweredIR
    ------------------------
+
+   -- Test C prettyprinter
+   -----------------------
+   let c = CProgram
+         [ CFunc $ CFunction
+            { ty = CInt
+            , name = pack "opAdd"
+            , args = 
+               [ CArg
+                  { ty = CInt
+                  , name = pack "a"
+                  }
+               , CArg
+                  { ty = CInt
+                  , name = pack "b"
+                  }
+               ]
+            , body =
+               [ CReturn $ Just $ CBinary
+                  Add
+                  (CVar $ pack "a")
+                  (CVar $ pack "b")
+               ]
+            }
+         ]
+
+   liftIO $ print $ prettyProgram c
+   -----------------------
+
 
    return warnings
 

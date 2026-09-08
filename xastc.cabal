@@ -37,7 +37,7 @@ library
         Xast.Parser.System,
         Xast.Parser.Type,
 
-        Xast.SemAnalyzer.Analysis,
+        Xast.SemAnalyzer.Pass,
         Xast.SemAnalyzer.Monad,
         Xast.SemAnalyzer.Query,
         Xast.SemAnalyzer.Types,
@@ -45,6 +45,11 @@ library
         Xast.Lowerer.Monad,
         Xast.Lowerer.Types,
         Xast.Lowerer.Pass,
+
+        Xast.Codegen.C.Monad,
+        Xast.Codegen.C.Types,
+        Xast.Codegen.C.Pass,
+        Xast.Codegen.C.Pretty,
 
         Xast.Utils.List,
         Xast.Utils.Pretty,
@@ -60,7 +65,8 @@ library
         vector ==0.13.2.0,
         directory ==1.3.9.0,
         parser-combinators ==1.3.0,
-        diagnose
+        diagnose,
+        prettyprinter ==1.7.2
     hs-source-dirs:   src
     default-language: GHC2021
 

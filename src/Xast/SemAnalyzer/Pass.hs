@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-unused-matches #-}
-module Xast.SemAnalyzer.Analysis where
+module Xast.SemAnalyzer.Pass where
 
 import Control.Monad.Except (ExceptT(..))
 import Control.Monad.State
