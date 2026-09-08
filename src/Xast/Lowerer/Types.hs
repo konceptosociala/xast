@@ -43,7 +43,6 @@ data KirInstruct
       KirBindingId
    deriving Show
 
-
 data KirTerm
    = KirReturn
    deriving Show

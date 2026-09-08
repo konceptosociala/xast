@@ -1,0 +1,70 @@
+module Std.Ops exporting *
+
+@Intrinsic
+extern fn opAdd (number, number) -> number;
+
+@Intrinsic
+extern fn opSub (number, number) -> number;
+
+@Intrinsic
+extern fn opMul (number, number) -> number;
+
+@Intrinsic
+extern fn opDiv (number, number) -> number;
+
+@Intrinsic
+extern fn opMod (number, number) -> number;
+
+@Intrinsic
+extern fn opPow(number, number) -> number;
+
+@Intrinsic
+extern fn opEq (number, number) -> Bool;
+
+@Intrinsic
+extern fn opNeq (number, number) -> Bool;
+
+@Intrinsic
+extern fn opLt (number, number) -> Bool;
+
+@Intrinsic
+extern fn opGt (number, number) -> Bool;
+
+@Intrinsic
+extern fn opLe (number, number) -> Bool;
+
+@Intrinsic
+extern fn opGe (number, number) -> Bool;
+
+@Intrinsic
+extern fn opAnd (Bool, Bool) -> Bool;
+
+@Intrinsic
+extern fn opOr (Bool, Bool) -> Bool;
+
+@Intrinsic
+extern fn opNot (Bool, Bool) -> Bool;
+
+@Intrinsic
+extern fn opPipe (a, fn(a) -> b) -> b;
+
+@Intrinsic
+extern fn opConcat (concatenative, concatenative) -> concatenative;
+
+@Intrinsic
+extern fn opNeg (number, number) -> number;
+
+@Intrinsic
+extern fn opBitwiseAnd (number, number) -> number;
+
+@Intrinsic
+extern fn opBitwiseOr (number, number) -> number;
+
+@Intrinsic
+extern fn opBitwiseXor (number, number) -> number;
+
+@Intrinsic
+extern fn opShiftLeft (number, number) -> number;
+
+@Intrinsic
+extern fn opShiftRight (number, number) -> number;

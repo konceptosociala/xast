@@ -1,0 +1,14 @@
+module Std.OptionResult exporting *
+
+use Std.Option { Option }
+use Std.Result { Result }
+
+fn ok (Result a e) -> Option a;
+fn ok res = match res with
+    Ok a -> Some a,
+    _    -> None;
+
+fn okOr (Option a, e) -> Result a e;
+fn okOr res = match res with
+    Some a -> Ok a,
+    _      -> Err e;

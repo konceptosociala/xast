@@ -1,0 +1,46 @@
+module Std.Option exporting *
+
+use Std.Error { error }
+
+type Option a = Some a | None;
+
+fn isSome (Option a) -> Bool;
+fn isSome opt = match opt with
+    Some _ -> True,
+    _      -> False;
+
+fn isNone (Option a) -> Bool;
+fn isNone opt = match opt with
+    Some _ -> False,
+    _      -> True;
+
+fn unwrap (Option a) -> a;
+fn unwrap opt = match opt with 
+    Some a -> a,
+    _      -> error "trying to unwrap on `None`";
+
+fn unwrapOr (Option a, a) -> a;
+fn unwrapOr opt b = match opt with 
+    Some a -> a,
+    _      -> b;
+
+fn map (fn(a) -> b, Option a) -> Option b;
+fn map f opt = match opt with
+    Some a -> Some (f a),
+    _      -> None;
+
+fn filter (fn(a) -> Bool, Option a) -> Option a;
+fn filter f opt = match opt with
+    Some a -> if f a then Some a else None,
+    _      -> None;
+
+fn andThen (fn(a) -> Option b, Option a) -> Option b;
+fn andThen f opt = match opt with
+    Some a -> f a,
+    _      -> None;
+
+fn flatten (Option (Option a)) -> Option a;
+fn flatten opt = match opt with
+    Some (Some a) -> Some a,
+    Some None     -> None,
+    _             -> None;

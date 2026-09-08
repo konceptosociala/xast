@@ -16,15 +16,6 @@ reserved =
    , "event", "res"
    ]
 
-builtin :: [Text]
-builtin =
-   -- Functions
-   [ "opAdd", "opSub", "opMul", "opDiv", "opMod"
-   , "opPow", "opEq", "opNeq", "opLt", "opGt"
-   , "opLe", "opGe", "opAnd", "opOr"
-   , "opPipe", "opApply", "opConcat"
-   ]
-
 genericIdent :: Parser Ident
 genericIdent = try $ lexeme $ do
    c <- lowerChar
