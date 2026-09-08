@@ -1,6 +1,9 @@
 module Std.String exports *
 
+use Std.Alloc { RawPtr }
+use Std.Num { USize }
+
 type String = String {
     data : RawPtr,
-    len : ULong,
+    len : USize,
 };

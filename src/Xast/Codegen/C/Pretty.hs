@@ -6,9 +6,7 @@ import Xast.Codegen.C.Types
 import Prettyprinter (Doc, Pretty (pretty), hardline, (<+>), encloseSep, vsep, indent, enclose)
 
 header :: Doc ann
-header =
-   "#include <stdbool.h>" <> hardline <>
-   "#include <stdint.h>" <> hardline <> hardline
+header = "#include <stdint.h>" <> hardline <> hardline
 
 prettyProgram :: CProgram -> Doc ann
 prettyProgram (CProgram decls) = 

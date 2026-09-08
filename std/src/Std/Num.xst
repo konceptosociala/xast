@@ -1,0 +1,21 @@
+module Std.Num exports *
+
+extern type Size;
+
+extern type USize;
+
+extern type Long;
+
+extern type ULong;
+
+extern type Int;
+
+extern type UInt;
+
+extern type Short;
+
+extern type UShort;
+
+extern type Byte;
+
+extern type UByte;

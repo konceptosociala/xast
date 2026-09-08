@@ -3,13 +3,15 @@ name    = "std"
 version = "0.1.0"
 author  = "Xast Platform"
 modules = [
+    "Std.Alloc",
+    "Std.Bool",
     "Std.Error",
+    "Std.Num",
     "Std.Ops",
     "Std.Option",
     "Std.OptionResult",
     "Std.Result",
     "Std.String",
-    "Std.Bool",
 ]
 
 [api]
