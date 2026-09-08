@@ -8,7 +8,7 @@ import Control.Monad.State
 import Control.Monad.Writer (listen, censor)
 import Control.Monad (forM_, unless, when, foldM, zipWithM_, zipWithM, forM)
 import Data.Maybe (mapMaybe, fromJust, fromMaybe)
-import Data.List (sortBy, intersperse, sortOn, groupBy)
+import Data.List (sortBy, sortOn, groupBy)
 import Data.Foldable (foldl')
 import qualified Data.Set as S
 import qualified Data.Map as M
@@ -23,8 +23,6 @@ import Xast.SemAnalyzer.Query
 import Text.Megaparsec (SourcePos(sourceName))
 import Control.Applicative ((<|>))
 import Xast.Utils.Generic (unreachableWith, (<--))
-import Xast.Html (renderDocument, renderTypedProgram, div_, hr, typedAstPage)
-import Data.Text (unpack)
 import qualified Data.Text as T
 
 -- #### FULL ANALYSIS ####
@@ -45,29 +43,24 @@ fullAnalysis reportWarnings saveFile progs = do
    (_, st2, warns2) <- ExceptT $ pure $ runPhase env st1 (importAnalysis progs)
    lift $ reportWarnings warns2
 
-   (progsResolved, st3, warns3) <- ExceptT $ pure $ runPhase env st2 (forM progs resolveNames)
+   (_, st3, warns3) <- ExceptT $ pure $ runPhase env st2 (forM_ progs resolveTypeUsages)
    lift $ reportWarnings warns3
 
-   (progsTyped, st4, warns4) <- ExceptT $ pure $ runPhase env st3 (forM progsResolved typeCheck)
+   (progsResolved, st4, warns4) <- ExceptT $ pure $ runPhase env st3 (forM progs resolveNames)
    lift $ reportWarnings warns4
+
+   (progsTyped, st5, warns5) <- ExceptT $ pure $ runPhase env st4 (forM progsResolved typeCheck)
+   lift $ reportWarnings warns5
 
    -- Types stored on AST nodes may have been frozen before later unification
    -- resolved their type variables (e.g. a variable's own reference is typed
    -- before its use forces a substitution). Zonk every node against the final
    -- substitution map so the typed AST reflects fully-resolved types.
-   let progsZonked = map (zonkProgram st4.tySubst) progsTyped
+   let progsZonked = map (zonkProgram st5.tySubst) progsTyped
 
-   -- Temporary HTML generation pass
-   ---------------------------------
-   let htmlProgs = map renderTypedProgram progsZonked
-   let htmlBox = div_ [] (intersperse hr htmlProgs)
-   let txt = renderDocument (typedAstPage "Typed AST" htmlBox)
-   _ <- lift $ saveFile "index.html" (unpack txt)
-   ---------------------------------
+   (progsDesugared, st6, warns6) <- ExceptT $ pure $ runPhase env st5 (forM progsZonked desugarProgram)
 
-   (progsDesugared, st5, warns5) <- ExceptT $ pure $ runPhase env st4 (forM progsZonked desugarProgram)
-
-   let warningsCount = sum $ map length [warns1, warns2, warns3, warns4]
+   let warningsCount = sum $ map length [warns1, warns2, warns3, warns4, warns5, warns6]
 
    return $ AnalysisResult
       { warningsCount = warningsCount
@@ -106,7 +99,7 @@ declareStmt = \case
    StmtTypeDef td@(TypeDef _ _ ident _ _) ->
       declareType ident td
 
-   StmtExtern (ExtFunc ef@(ExternFunc _ ident _ _)) ->
+   StmtExtern (ExtFunc ef@(ExternFunc _ _ ident _ _)) ->
       declareExternFn ident ef
 
    StmtExtern (ExtType et@(ExternType _ ident _)) ->
@@ -172,11 +165,11 @@ declareType ident (TypeDef loc _ _ generics ctors) = do
    where
       payloadFields = \case
          PUnit -> (Nothing, [])
-         (PTuple tys) -> (Nothing, tys)
-         (PRecord fs) -> (Just (map (.name) fs), map (.ty) fs)
+         (PTuple tys) -> (Nothing, map (.node) tys)
+         (PRecord fs) -> (Just (map (.name) fs), map ((.node) . (.ty)) fs)
 
 declareExternFn :: Ident -> ExternFunc -> SemAnalyzer ()
-declareExternFn ident ef@(ExternFunc loc _ _ _) = do
+declareExternFn ident ef@(ExternFunc loc _ _ _ _) = do
    eid <- freshExternId
    declareSymbol ident (SymbolExternFn loc eid (externFuncSig ef)) SEExternFnRedeclaration
 
@@ -440,6 +433,66 @@ resolveSelfImport (Program (ModuleDef from this _) imports _ _) =
       (Located to _):_ -> errSem (SESelfImportError this from to)
       [] -> return ()
 
+-- #### RESOLVE TYPE USAGES ####
+
+resolveTypeUsages :: Program Parsed -> SemAnalyzer ()
+resolveTypeUsages (Program (ModuleDef _ m _) imps stmts _) = do
+   modify $ \st -> st { currentModule = m }
+   forM_ stmts (resolveStmtTypeUsages imps)
+
+resolveStmtTypeUsages :: [Located ImportDef] -> Stmt Parsed -> SemAnalyzer ()
+resolveStmtTypeUsages imps stmt =
+   let checkLocatedType (Located loc ty) = checkType imps loc ty
+   in case stmt of
+      StmtTypeDef (TypeDef _ _ _ _ ctors) ->
+         forM_ ctors $ \ctor ->
+            forM_ (payloadTypes ctor.payload) checkLocatedType
+
+      StmtFunc (FnDef (FuncDef _ _ _ args retType)) ->
+         forM_ (retType : args) checkLocatedType
+
+      StmtFunc (FnImpl _) -> pure ()
+
+      StmtExtern (ExtFunc (ExternFunc _ _ _ args retType)) ->
+         forM_ (retType : args) checkLocatedType
+
+      StmtExtern (ExtType _) -> pure ()
+
+      StmtSystem (SysDef (SystemDef _ _ _ entities retType with)) -> do
+         forM_ entities $ \(QueriedEntity tys) -> forM_ tys checkLocatedType
+         checkLocatedType retType
+         forM_ (fromMaybe [] with) (checkLocatedType . withTypeLoc)
+
+      StmtSystem (SysImpl _) -> pure ()
+
+payloadTypes :: Payload -> [Located Type]
+payloadTypes = \case
+   PUnit        -> []
+   PTuple tys   -> tys
+   PRecord flds -> map (.ty) flds
+
+withTypeLoc :: WithType -> Located Type
+withTypeLoc (WithEvent lt) = lt
+withTypeLoc (WithRes lt)   = lt
+
+-- | Recursively resolves every `TyCon` occurring in a type against the
+-- current module's declarations and its unqualified imports.
+checkType :: [Located ImportDef] -> Location -> Type -> SemAnalyzer ()
+checkType imps loc = \case
+   TyCon ident -> do
+      modSym <- lookupCurrentTypeName ident
+      impSym <- lookupUnqualifiedTypeName imps ident
+      case modSym <|> impSym of
+         Just _  -> pure ()
+         Nothing -> errSem (SEUndefinedType loc ident)
+   TyApp a b     -> checkType imps loc a >> checkType imps loc b
+   TyTuple xs    -> forM_ xs (checkType imps loc)
+   TyFn args ret -> forM_ args (checkType imps loc) >> checkType imps loc ret
+   TyGnr _       -> pure ()
+   TyVar _       -> pure ()
+   TyInt _       -> pure ()
+   TyInvalid     -> pure ()
+
 -- #### RESOLVE NAMES ####
 resolveNames :: Program Parsed -> SemAnalyzer (Program Resolved)
 resolveNames (Program md@(ModuleDef _ m _) imps stmts src) = do
@@ -585,7 +638,7 @@ resolveEntityPattern scope sysRet mEnt (EntityPattern bindings) =
    EntityPattern (zipWith bindOne tys bindings)
    where
       tys = case mEnt of
-         Just (QueriedEntity ts) -> map Just ts ++ repeat Nothing
+         Just (QueriedEntity ts) -> map (Just . (.node)) ts ++ repeat Nothing
          Nothing                 -> repeat Nothing
 
       bindOne mTy (EntPatBinding pat _) =
@@ -749,7 +802,8 @@ typeCheckStmt imps (StmtSystem (SysImpl (SystemImpl implLoc sysIdent entPats mWi
    unless (length entPats == length sigEnts) $
       errSem (SESystemArityMismatch implLoc sysIdent (length sigEnts) (length entPats))
 
-   entResults <- forM (zip entPats sigEnts) $ \(EntityPattern bindings, QueriedEntity tys) -> do
+   entResults <- forM (zip entPats sigEnts) $ \(EntityPattern bindings, QueriedEntity tysLoc) -> do
+      let tys = map (.node) tysLoc
       unless (length bindings == length tys) $
          errSem (SESystemArityMismatch implLoc sysIdent (length tys) (length bindings))
       inferred <- zipWithM
@@ -794,8 +848,8 @@ typeCheckStmt _ (StmtTypeDef td) = pure $ StmtTypeDef td
 typeCheckStmt _ (StmtExtern ext) = pure $ StmtExtern ext
 
 withType :: WithType -> Type
-withType (WithEvent ty) = ty
-withType (WithRes ty)   = ty
+withType (WithEvent lt) = lt.node
+withType (WithRes lt)   = lt.node
 
 freshTyVar :: SemAnalyzer Type
 freshTyVar = do

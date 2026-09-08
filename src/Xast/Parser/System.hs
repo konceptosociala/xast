@@ -27,23 +27,23 @@ systemDef modifiers = withLoc $ do
    name        <- typeIdent
    entities    <- many queriedEntity
    _           <- symbol "->"
-   retType     <- type'
+   retType     <- located type'
    with        <- optional with'
    _           <- endOfStmt
 
    return $ \location -> SystemDef {..}
 
 queriedEntity :: Parser QueriedEntity
-queriedEntity = QueriedEntity <$> 
-   between (symbol "#(") (symbol ")") (type' `sepEndBy1` symbol ",")
+queriedEntity = QueriedEntity <$>
+   between (symbol "#(") (symbol ")") (located type' `sepEndBy1` symbol ",")
 
 with' :: Parser [WithType]
 with' = symbol "with" *> (withType `sepBy1` symbol ",")
    where
       withType :: Parser WithType
       withType = choice
-         [ WithEvent <$ symbol "event" <* symbol ":" <*> type'
-         , WithRes   <$ symbol "res" <* symbol ":" <*> type'
+         [ WithEvent <$ symbol "event" <* symbol ":" <*> located type'
+         , WithRes   <$ symbol "res" <* symbol ":" <*> located type'
          ]
 
 systemImpl :: Parser (SystemImpl Parsed)

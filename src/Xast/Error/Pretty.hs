@@ -197,6 +197,16 @@ instance PrintError SemError where
 
       in printReportAt filename report
 
+   printError (SEUndefinedType loc ident) =
+      let Location pos _ len = loc
+          filename = sourceName pos
+          report = errReport
+            ("Undefined type: " <> show (blue (show ident)))
+            [ (toPosition pos len filename, This "Not declared in this module or brought in by an import") ]
+            []
+
+      in printReportAt filename report
+
    printError (SEFnArityMismatch loc ident expected actual) =
       let Location pos _ len = loc
           filename = sourceName pos

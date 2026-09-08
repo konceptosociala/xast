@@ -1,14 +1,14 @@
-module Std.OptionResult exporting *
+module Std.OptionResult exports *
 
-use Std.Option { Option }
-use Std.Result { Result }
+use Std.Option { Option, Some, None }
+use Std.Result { Result, Ok, Err }
 
 fn ok (Result a e) -> Option a;
-fn ok res = match res with
+fn ok result = match result with
     Ok a -> Some a,
     _    -> None;
 
 fn okOr (Option a, e) -> Result a e;
-fn okOr res = match res with
+fn okOr result e = match result with
     Some a -> Ok a,
     _      -> Err e;

@@ -8,6 +8,8 @@ modules = [
     "Std.Option",
     "Std.OptionResult",
     "Std.Result",
+    "Std.String",
+    "Std.Bool",
 ]
 
 [api]

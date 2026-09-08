@@ -15,10 +15,11 @@ data Env = Env
    { vars      :: M.Map Ident VarInfo
    , functions :: M.Map Ident FuncSig 
    , systems   :: M.Map Ident SystemSig
+   , allowedIntrinsics :: [Ident]
    }
 
 emptyEnv :: Env
-emptyEnv = Env M.empty M.empty M.empty
+emptyEnv = Env M.empty M.empty M.empty allowedIntrinsics
 
 data SymTable = SymTable
    { modules         :: M.Map Module ModuleInfo
@@ -116,13 +117,13 @@ data FuncSig = FuncSig
    deriving (Eq, Show)
 
 funcSig :: FuncDef -> FuncSig
-funcSig fn = FuncSig fn.args fn.retType
+funcSig fn = FuncSig (map (.node) fn.args) fn.retType.node
 
 externFuncSig :: ExternFunc -> FuncSig
-externFuncSig fn = FuncSig fn.args fn.retType
+externFuncSig fn = FuncSig (map (.node) fn.args) fn.retType.node
 
 systemSig :: SystemDef -> SystemSig
 systemSig def =
-   SystemSig def.name def.entities def.retType def.with
+   SystemSig def.name def.entities def.retType.node def.with
 
 data SuggestedImports = SuggestedImports Ident [Module]

@@ -1,4 +1,4 @@
-module Std.String exporting *
+module Std.String exports *
 
 type String = String {
     data : RawPtr,

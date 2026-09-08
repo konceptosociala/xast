@@ -1,0 +1,3 @@
+module Std.Bool exports *
+
+type Bool = True | False;

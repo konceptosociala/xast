@@ -107,6 +107,23 @@ lookupQualifiedConType imps alias ident = do
       Just s@(SymbolType _ (TypeSig ctors _)) | S.member ident ctors -> Just s
       _ -> Nothing
 
+isTypeSymbol :: SymbolInfo -> Bool
+isTypeSymbol = \case
+   SymbolType {}       -> True
+   SymbolTypeCtor {}   -> True
+   SymbolExternType {} -> True
+   _                   -> False
+
+lookupCurrentTypeName :: Ident -> SemAnalyzer (Maybe SymbolInfo)
+lookupCurrentTypeName ident = do
+   symbol <- lookupCurrentModule ident
+   pure (symbol >>= \s -> if isTypeSymbol s then Just s else Nothing)
+
+lookupUnqualifiedTypeName :: [Located ImportDef] -> Ident -> SemAnalyzer (Maybe SymbolInfo)
+lookupUnqualifiedTypeName imps ident = do
+   symbol <- lookupUnqualifiedSymbol imps ident
+   pure (symbol >>= \s -> if isTypeSymbol s then Just s else Nothing)
+
 lookupCurrentFunction :: Ident -> SemAnalyzer (Maybe FuncSig)
 lookupCurrentFunction ident = do
    symbol <- lookupCurrentModule ident

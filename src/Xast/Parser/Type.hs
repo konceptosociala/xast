@@ -6,7 +6,7 @@ import Data.Function ((&))
 import Text.Megaparsec (choice, sepBy, between, some, MonadParsec (try), many, sepBy1, sepEndBy)
 
 import Xast.Parser.Ident
-import Xast.Parser.Common (Parser, symbol, lexeme, endOfStmt, withLoc)
+import Xast.Parser.Common (Parser, symbol, lexeme, endOfStmt, withLoc, located)
 import Xast.AST
 import Data.List (foldl1')
 import Xast.Parser.Modifier (typeModifier, noRepeatedModifiers)
@@ -32,7 +32,7 @@ ctor = withLoc $ do
 payload' :: Parser Payload
 payload' = choice
    [ PRecord   <$> between (symbol "{") (symbol "}") (field `sepEndBy` symbol ",")
-   , PTuple    <$> try (some (lexeme atomType))
+   , PTuple    <$> try (some (located (lexeme atomType)))
    , PUnit     & pure
    ]
 
@@ -40,7 +40,7 @@ field :: Parser Field
 field = do
    name  <- varIdent
    _     <- symbol ":"
-   ty    <- type'
+   ty    <- located type'
 
    return Field {..}
 
@@ -58,7 +58,14 @@ atomType = choice
       <* symbol "->"
       <*> type'
    , TyCon <$> typeIdent
+   , TyInt <$> try typeIntrinsic
    , TyGnr <$> genericIdent
+   ]
+
+typeIntrinsic :: Parser TyIntrinsic
+typeIntrinsic = choice
+   [ TyNumber <$ symbol "number"
+   , TyConcat <$ symbol "concatenative"
    ]
 
 tupleOrParens :: Parser Type

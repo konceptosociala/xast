@@ -22,9 +22,9 @@ funcDef :: [Modifier] -> Parser FuncDef
 funcDef modifiers = withLoc $ do
    _           <- symbol "fn"
    name        <- fnIdent
-   args        <- between (symbol "(") (symbol ")") (type' `sepBy` symbol ",")
+   args        <- between (symbol "(") (symbol ")") (located type' `sepBy` symbol ",")
    _           <- symbol "->"
-   retType     <- type'
+   retType     <- located type'
    _           <- endOfStmt
 
    return $ \location -> FuncDef {..}

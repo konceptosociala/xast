@@ -32,6 +32,7 @@ data SemError
    -- Undefined symbols
    | SEUndefinedVar Location Ident
    | SEUndefinedCon Location Ident
+   | SEUndefinedType Location Ident
    | SEUndefinedAlias FilePath Ident
    | SEMissingFnDef Location Ident
    | SEExtraFnDef Location Ident [Location]

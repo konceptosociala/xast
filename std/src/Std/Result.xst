@@ -1,51 +1,47 @@
-module Std.Result exporting *
+module Std.Result exports *
 
+use Std.Bool *
 use Std.Error { error }
 
 type Result a e = Ok a | Err e;
 
 fn isOk (Result a e) -> Bool;
-fn isOk res = match res with
+fn isOk result = match result with
     Ok _ -> True,
     _    -> False;
 
 fn isErr (Result a e) -> Bool;
-fn isErr res = match res with
+fn isErr result = match result with
     Ok _ -> False,
     _    -> True;
 
 fn unwrap (Result a e) -> a;
-fn unwrap res = match res with 
+fn unwrap result = match result with 
     Ok a -> a,
     _    -> error "trying to unwrap on `Err`";
 
-fn unwrapErr (Result a e) -> a;
-fn unwrapErr res = match res with 
+fn unwrapErr (Result a e) -> e;
+fn unwrapErr result = match result with 
     Err e -> e,
     _     -> error "trying to unwrap error on `Ok`";
 
 fn unwrapOr (Result a e, a) -> a;
-fn unwrapOr res b = match res with 
+fn unwrapOr result b = match result with 
     Ok a -> a,
     _    -> b;
 
-fn map (fn(a) -> b, Result a) -> Result b;
-fn map f res = match res with
-    Ok a -> Ok (f a),
-    _      -> Err;
-
-fn filter (fn(a) -> Bool, Result a) -> Result a;
-fn filter f res = match res with
-    Ok a -> if f a then Ok a else Err,
-    _      -> Err;
+fn map (fn(a) -> b, Result a e) -> Result b e;
+fn map f result = match result with
+    Ok a  -> Ok (f a),
+    Err e -> Err e;
 
 fn andThen (fn(a) -> Result b e, Result a e) -> Result b e;
-fn andThen f res = match res with
-    Ok a -> f a,
-    err  -> err;
+fn andThen f result = match result with
+    Ok a  -> f a,
+    Err e -> Err e;
 
-fn flatten (Result (Result a e) e) -> Result a;
-fn flatten res = match res with
+fn flatten (Result (Result a e) e) -> Result a e;
+fn flatten result = match result with
     Ok (Ok a)  -> Ok a,
     Ok (Err e) -> Err e,
-    err        -> err;
+    Err e      -> Err e;

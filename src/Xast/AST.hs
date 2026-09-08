@@ -1,10 +1,25 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Xast.AST where
 
 import Data.List (intercalate)
 import GHC.Generics (Generic)
 import Data.Text (Text, unpack)
 import Text.Megaparsec (SourcePos)
+
+allowedIntrinsics :: [Ident]
+allowedIntrinsics =
+   -- Basic operations
+   [ Ident "opAdd",        Ident "opSub",          Ident "opMul"
+   , Ident "opDiv",        Ident "opMod",          Ident "opPow"
+   , Ident "opEq",         Ident "opNeq",          Ident "opLt"
+   , Ident "opGt",         Ident "opLe",           Ident "opGe"
+   , Ident "opAnd",        Ident "opOr",           Ident "opNot"
+   , Ident "opPipe",       Ident "opApply",        Ident "opConcat"
+   , Ident "opNeg",        Ident "opBitwiseAnd",   Ident "opBitwiseOr"
+   , Ident "opBitwiseXor", Ident "opShiftLeft",    Ident "opShiftRight"
+   -- 
+   ]
 
 data Located a = Located
    { location :: Location
@@ -33,6 +48,7 @@ displayModifier = \case
    FnMod ModInline                  -> "@Inline"
    FnMod (ModDeprecated _)          -> "@Deprecated"
    FnMod ModSupUnreachable          -> "@SuppressUnreachable"
+   FnMod ModCompileTime             -> "@CompileTime"
    SysMod (ModCompDispatchMode _)   -> "@Mode"
    SysMod (ModLabel _)              -> "@Label"
    SysMod ModParallel               -> "@Parallel"
@@ -58,6 +74,7 @@ data FnModifier
    | ModInline
    | ModDeprecated Text
    | ModSupUnreachable
+   | ModCompileTime
    deriving (Eq, Show)
 
 data SysModifier
@@ -259,9 +276,10 @@ data Extern = ExtFunc ExternFunc | ExtType ExternType
 
 data ExternFunc = ExternFunc
    { location  :: Location
+   , modifiers :: [Modifier]
    , name      :: Ident
-   , args      :: [Type]
-   , retType   :: Type
+   , args      :: [Located Type]
+   , retType   :: Located Type
    }
    deriving (Eq, Show)
 
@@ -280,8 +298,8 @@ data FuncDef = FuncDef
    { location  :: Location
    , modifiers :: [Modifier]
    , name      :: Ident
-   , args      :: [Type]
-   , retType   :: Type
+   , args      :: [Located Type]
+   , retType   :: Located Type
    }
    deriving (Eq, Show)
 
@@ -429,17 +447,17 @@ data SystemDef = SystemDef
    , modifiers :: [Modifier]
    , name      :: Ident
    , entities  :: [QueriedEntity]
-   , retType   :: Type
+   , retType   :: Located Type
    , with      :: Maybe [WithType]
    }
    deriving (Eq, Show)
 
-newtype QueriedEntity = QueriedEntity [Type]
+newtype QueriedEntity = QueriedEntity [Located Type]
    deriving (Eq, Show)
 
 data WithType
-   = WithEvent Type
-   | WithRes Type
+   = WithEvent (Located Type)
+   | WithRes (Located Type)
    deriving (Eq, Show)
 
 data SystemImpl a = SystemImpl
@@ -485,13 +503,13 @@ data Ctor = Ctor
 
 data Payload
    = PUnit
-   | PTuple [Type]
+   | PTuple [Located Type]
    | PRecord [Field]
    deriving (Eq, Show)
 
 data Field = Field      -- fieldOne : Int
    { name   :: Ident   -- field2 : Maybe Bool
-   , ty     :: Type
+   , ty     :: Located Type
    }
    deriving (Eq, Show)
 
@@ -502,7 +520,13 @@ data Type
    | TyTuple [Type]     -- (Bool, a, Maybe String)
    | TyFn [Type] Type   -- fn(Type1, Type2 ... TypeN) -> TypeRet
    | TyVar Int          -- t0, t3
+   | TyInt TyIntrinsic  -- number, concatenative
    | TyInvalid          -- <invalid>
+   deriving (Eq, Show)
+
+data TyIntrinsic
+   = TyNumber
+   | TyConcat
    deriving (Eq, Show)
 
 typename :: Type -> String
@@ -513,7 +537,9 @@ typename (TyFn args ret) = "fn(" ++ intercalate ", " (map typename args) ++ ") -
 typename (TyApp applicant operand) =
    let (headTy, args) = tyAppSpine applicant operand
    in unwords (typename headTy : map typenameArg args)
-typename (TyVar n) = "t" ++ show n
+typename (TyVar n) = "t" ++ show (n `mod` 10)
+typename (TyInt TyNumber) = "number"
+typename (TyInt TyConcat) = "concat"
 typename TyInvalid = "<invalid>"
 
 tyAppSpine :: Type -> Type -> (Type, [Type])

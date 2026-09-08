@@ -20,6 +20,7 @@ modifier = "@" *> choice
       , ModInline          <$ symbol "Inline"
       , ModDeprecated      <$ symbol "Deprecated" <*> between (symbol "(") (symbol ")") (stringLiteral <?> "string literal")
       , ModSupUnreachable  <$ symbol "SuppressUnreachable"
+      , ModCompileTime     <$ symbol "CompileTime"
       ]
    , SysMod <$> choice
       [ ModCompDispatchMode   <$ symbol "Mode" <*> between (symbol "(") (symbol ")") compDispatchMode
@@ -87,14 +88,15 @@ modifierTag = \case
    FnMod ModInline                  -> 2
    FnMod (ModDeprecated _)          -> 3
    FnMod ModSupUnreachable          -> 4
-   SysMod (ModCompDispatchMode _)   -> 5
-   SysMod (ModLabel _)              -> 6
-   SysMod ModParallel               -> 7
-   TypeMod ModSingleton             -> 8
-   TypeMod ModCopyable              -> 9
-   TypeMod ModTag                   -> 10
-   TypeMod ModNonExhaustive         -> 11
-   ExtFnMod ModIntrinsic            -> 12
+   FnMod ModCompileTime             -> 5
+   SysMod (ModCompDispatchMode _)   -> 6
+   SysMod (ModLabel _)              -> 7
+   SysMod ModParallel               -> 8
+   TypeMod ModSingleton             -> 9
+   TypeMod ModCopyable              -> 10
+   TypeMod ModTag                   -> 11
+   TypeMod ModNonExhaustive         -> 12
+   ExtFnMod ModIntrinsic            -> 13
 
 -- | Fails the parse if any two modifiers in the list share a kind
 noRepeatedModifiers :: [Modifier] -> Parser [Modifier]
