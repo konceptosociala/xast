@@ -12,7 +12,7 @@ reserved :: [Text]
 reserved = 
    -- Keywords
    [ "type", "fn", "let", "in", "if", "then", "else"
-   , "match", "of", "and", "system", "with", "extern"
+   , "match", "system", "with", "extern"
    , "event", "res"
    ]
 

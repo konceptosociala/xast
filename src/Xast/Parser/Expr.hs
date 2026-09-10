@@ -324,7 +324,7 @@ lambda = do
 
 letIn :: Parser (LetIn Parsed)
 letIn = do
-   bindings <- let' `sepBy1` symbol "and"
+   bindings <- let' `sepBy1` symbol ","
    _        <- symbol "in"
    bindExpr <- expr
 

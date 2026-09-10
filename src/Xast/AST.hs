@@ -4,7 +4,7 @@ module Xast.AST where
 
 import Data.List (intercalate)
 import GHC.Generics (Generic)
-import Data.Text (Text, unpack)
+import Data.Text (Text, unpack, pack)
 import Text.Megaparsec (SourcePos)
 
 allowedIntrinsics :: [Ident]
@@ -358,8 +358,11 @@ patLoc = (.location) . patAnnotation
 newtype Module = Module [Ident]
    deriving (Eq, Ord)
 
-moduleToPath :: Module -> String
-moduleToPath (Module ids) = "src/" ++ concatMap (\(Ident t) -> unpack t ++ "/") (init ids) ++ unpack (let Ident t = last ids in t) ++ ".xst"
+moduleToPath :: Module -> String -> String
+moduleToPath (Module ids) extension = "src/" ++ concatMap (\(Ident t) -> unpack t ++ "/") (init ids) ++ unpack (let Ident t = last ids in t) ++ extension
+
+namespacedName :: Module -> Ident -> Text
+namespacedName (Module ids) name = pack $ concatMap (\(Ident t) -> unpack t ++ "_") ids ++ unpack name.inner
 
 instance Show Module where
    show :: Module -> String

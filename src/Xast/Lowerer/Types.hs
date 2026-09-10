@@ -1,19 +1,20 @@
 module Xast.Lowerer.Types where
 
-import Xast.AST (Type, Literal, BindingAccess)
+import Xast.AST (Type, Literal, BindingAccess, Module)
 import Data.Text (Text)
 
 newtype LowerState = LowerState
-   { kirNameSupply :: Int
+   { nameSupply :: Int
    }
 
 emptyLowerState :: LowerState
-emptyLowerState = LowerState { kirNameSupply = 0 }
+emptyLowerState = LowerState { nameSupply = 0 }
 
 -- KIRA = Khast Intermediate RepresentAtion
 data Kira = Kira
-   { kirSystems :: [KirSystem]
-   , kirFns :: () -- TODO: add pure functions
+   { moduleName :: Module
+   , systems :: [KirSystem]
+   , functions :: [()] -- TODO: add pure functions
    }
    deriving Show
 
@@ -21,20 +22,20 @@ newtype KirName = KirName Text
    deriving Show
 
 data KirSystem = KirSystem
-   { kirSysName :: KirName
-   , kirSysBindings :: [KirBinding]
-   , kirSysBody :: KirBlock
+   { name :: KirName
+   , bindings :: [KirBinding]
+   , body :: KirBlock
    }
    deriving Show
 
 data KirBlock = KirBlock
-   { kirInstructs :: [KirInstruct]
-   , kirTerm :: KirTerm
+   { instructs :: [KirInstruct]
+   , term :: KirTerm
    }
    deriving Show
 
 data KirInstruct
-   = KirCall KirName [KirValue] KirName
+   = KirCall Type KirName [KirValue] KirName
    | KirAssign KirBindingId KirValue
    | KirMatch 
       KirValue 
@@ -57,9 +58,9 @@ newtype KirBindingId = KirBindingId Int
    deriving Show
 
 data KirBinding = KirBinding
-   { kirBindType    :: Type
-   , kirBindSrc     :: KirBindingSrc
-   , kirBindAccess  :: BindingAccess
+   { bindType    :: Type
+   , bindSrc     :: KirBindingSrc
+   , bindAccess  :: BindingAccess
    }
    deriving Show
 

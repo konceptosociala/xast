@@ -4,14 +4,22 @@ module Xast.Codegen.C.Pretty where
 
 import Xast.Codegen.C.Types
 import Prettyprinter (Doc, Pretty (pretty), hardline, (<+>), encloseSep, vsep, indent, enclose)
+import Xast.Utils.Pretty (bold, cyan)
+import Data.List (intercalate)
+
+debugPrograms :: [CProgram] -> String
+debugPrograms progs = intercalate "\n\n" $ flip map progs $ \prog ->
+   let path = show $ bold $ cyan prog.path
+       code = show $ prettyProgram prog
+   in path ++ ":\n" ++ code
 
 header :: Doc ann
 header = "#include <stdint.h>" <> hardline <> hardline
 
 prettyProgram :: CProgram -> Doc ann
-prettyProgram (CProgram decls) = 
+prettyProgram prog = 
    header <>
-   foldMap prettyDecl decls
+   foldMap prettyDecl prog.declarations
 
 prettyDecl :: CDecl -> Doc ann
 prettyDecl (CFunc func) = prettyFunction func
@@ -65,10 +73,15 @@ prettyExpr = \case
    CVar name            -> pretty name
    CIntLit int          -> pretty int
    CFloatLit float      -> pretty float
-   CCall caller args    -> prettyExpr caller <> encloseSep "(" ")" ", " (map prettyExpr args)
+   CInvoke caller args    -> prettyExpr caller <> encloseSep "(" ")" ", " (map prettyCArg args)
    CBinary op a b       -> prettyExpr a <+> prettyBinOp op <+> prettyExpr b
    CUnary op a          -> prettyUnOp op <+> prettyExpr a
    CAssign left right   -> prettyExpr left <+> "=" <+> prettyExpr right
+
+prettyCArg :: CArg -> Doc ann
+prettyCArg = \case
+   CExprArg expr -> prettyExpr expr
+   CTypeArg ty -> prettyType ty
 
 prettyBinOp :: CBinOp -> Doc ann
 prettyBinOp = \case
@@ -92,15 +105,17 @@ prettyUnOp = \case
    AddrOf -> "&"
    Deref -> "*"
 
-prettyArg :: CArg -> Doc ann
+prettyArg :: CFuncArg -> Doc ann
 prettyArg arg = prettyType arg.ty <+> pretty arg.name
 
 prettyGlobal :: CGlobal -> Doc ann
-prettyGlobal global = "<global>"
+prettyGlobal _global = "/* globals are not implemented */"
 
 prettyType :: CType -> Doc ann
 prettyType = \case
    CVoid    -> "void"
+   CSize    -> "ptrdiff_t"
+   CUSize   -> "size_t"
    CLong    -> "int64_t"
    CInt     -> "int32_t"
    CShort   -> "int16_t"

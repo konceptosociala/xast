@@ -21,7 +21,8 @@ import qualified Toml
 import Control.Monad.RWS (MonadTrans(lift))
 import Xast.Lowerer.Pass (lowerPrograms)
 import Xast.Codegen.C.Types
-import Xast.Codegen.C.Pretty (prettyProgram)
+import Xast.Codegen.C.Pretty (prettyProgram, debugPrograms)
+import Xast.Codegen.C.Pass (codegen)
 
 runCompile :: Maybe FilePath -> IO ()
 runCompile dir = runCompile_ dir >>= \case
@@ -62,7 +63,7 @@ runCompile_ dir = runExceptT $ do
       Right cfg   -> pure cfg
 
    invalidModules <- liftIO $ filterM
-      (\m -> not <$> doesFileExist (currentDir ++ "/" ++ moduleToPath m))
+      (\m -> not <$> doesFileExist (currentDir ++ "/" ++ moduleToPath m ".xst"))
       config.projectConfig.modules
 
    case invalidModules of
@@ -83,6 +84,11 @@ runCompile_ dir = runExceptT $ do
 
    -- Lowering AST into KIRA
    let loweredIR = lowerPrograms progsAnalyzed
+
+   -- Generating C
+   let generatedC = codegen loweredIR
+
+   liftIO $ putStrLn $ debugPrograms generatedC
    
    -- Temporary printing IR
    ------------------------
@@ -91,30 +97,31 @@ runCompile_ dir = runExceptT $ do
 
    -- Test C prettyprinter
    -----------------------
-   let c = CProgram
-         [ CFunc $ CFunction
-            { ty = CInt
-            , name = pack "opAdd"
-            , args = 
-               [ CArg
-                  { ty = CInt
-                  , name = pack "a"
-                  }
-               , CArg
-                  { ty = CInt
-                  , name = pack "b"
-                  }
-               ]
-            , body =
-               [ CReturn $ Just $ CBinary
-                  Add
-                  (CVar $ pack "a")
-                  (CVar $ pack "b")
-               ]
-            }
-         ]
+   -- let c = CProgram
+   --       "<path>"
+   --       [ CFunc $ CFunction
+   --          { ty = CInt
+   --          , name = pack "opAdd"
+   --          , args = 
+   --             [ CArg
+   --                { ty = CInt
+   --                , name = pack "a"
+   --                }
+   --             , CArg
+   --                { ty = CInt
+   --                , name = pack "b"
+   --                }
+   --             ]
+   --          , body =
+   --             [ CReturn $ Just $ CBinary
+   --                Add
+   --                (CVar $ pack "a")
+   --                (CVar $ pack "b")
+   --             ]
+   --          }
+   --       ]
 
-   liftIO $ print $ prettyProgram c
+   -- liftIO $ print $ prettyProgram c
    -----------------------
 
 
@@ -122,6 +129,6 @@ runCompile_ dir = runExceptT $ do
 
 parseOne :: FilePath -> Module -> IO (Either XastError (Program Parsed))
 parseOne currentDir module_ = runExceptT $ do
-   let filepath = currentDir ++ "/" ++ moduleToPath module_
+   let filepath = currentDir ++ "/" ++ moduleToPath module_ ".xst"
    code <- liftIO $ readFile filepath
    ExceptT $ pure $ parseProgram filepath (pack code)

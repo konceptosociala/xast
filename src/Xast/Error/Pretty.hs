@@ -32,7 +32,7 @@ instance PrintError XastError where
       printDiagnostic stdout WithUnicode (TabSize 4) defaultStyle diagnostic
 
    printError (XastModuleNotFound module_ dir) = do
-      let msg = "Module `" <> show module_ <> "` not found at path: " <> dir <> "/" <> moduleToPath module_
+      let msg = "Module `" <> show module_ <> "` not found at path: " <> dir <> "/" <> moduleToPath module_ ".xst"
       let report = Err Nothing msg [] []
       let diagnostic = addReport mempty report
       printDiagnostic stdout WithUnicode (TabSize 4) defaultStyle diagnostic

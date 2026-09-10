@@ -1,7 +1,11 @@
 module Xast.Codegen.C.Types where
+
 import Data.Text (Text)
 
-newtype CProgram = CProgram [CDecl]
+data CProgram = CProgram
+   { path :: FilePath
+   , declarations :: [CDecl]
+   }
 
 data CDecl 
    = CFunc CFunction
@@ -10,11 +14,11 @@ data CDecl
 data CFunction = CFunction
    { ty   :: CType
    , name :: Text
-   , args :: [CArg]
+   , args :: [CFuncArg]
    , body :: [CStmt]
    }
 
-data CArg = CArg
+data CFuncArg = CFuncArg
    { ty   :: CType
    , name :: Text
    }
@@ -26,7 +30,9 @@ data CGlobal = CGlobal
    }
 
 data CType
-   = CVoid
+   = CVoid     -- void
+   | CSize     -- ptrdiff_t
+   | CUSize    -- size_t
    | CLong     -- int64_t
    | CInt      -- int32_t
    | CShort    -- int16_t
@@ -45,10 +51,14 @@ data CExpr
    = CVar Text
    | CIntLit Int
    | CFloatLit Double
-   | CCall CExpr [CExpr]
+   | CInvoke CExpr [CArg]
    | CBinary CBinOp CExpr CExpr
    | CUnary CUnOp CExpr
    | CAssign CExpr CExpr
+
+data CArg
+   = CExprArg CExpr
+   | CTypeArg CType
 
 data CBinOp
    = Add | Sub | Mul | Div
