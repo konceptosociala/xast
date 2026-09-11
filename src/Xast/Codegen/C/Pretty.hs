@@ -14,7 +14,9 @@ debugPrograms progs = intercalate "\n\n" $ flip map progs $ \prog ->
    in path ++ ":\n" ++ code
 
 header :: Doc ann
-header = "#include <stdint.h>" <> hardline <> hardline
+header = 
+   "#include <stdint.h>" <> hardline <>
+   "#include <flecs.h>" <> hardline <> hardline
 
 prettyProgram :: CProgram -> Doc ann
 prettyProgram prog = 
@@ -51,18 +53,18 @@ prettyStmt = \case
    CIf cond if' Nothing ->
       "if" <+> enclose "(" ")" (prettyExpr cond) <+> vsep 
          [ "{"
-         , indent 4 (prettyStmt if')
+         , indent 4 (vsep (map prettyStmt if'))
          , "}"
          ]
    CIf cond if' (Just else') ->
       "if" <+> enclose "(" ")" (prettyExpr cond) <+> vsep 
          [ "{"
-         , indent 4 (prettyStmt if')
+         , indent 4 (vsep (map prettyStmt if'))
          , "}"
          ] <+>
       "else" <+> vsep 
          [ "{"
-         , indent 4 (prettyStmt else')
+         , indent 4 (vsep (map prettyStmt else'))
          , "}"
          ]
    CWhile _ _ -> undefined
@@ -73,9 +75,9 @@ prettyExpr = \case
    CVar name            -> pretty name
    CIntLit int          -> pretty int
    CFloatLit float      -> pretty float
-   CInvoke caller args    -> prettyExpr caller <> encloseSep "(" ")" ", " (map prettyCArg args)
+   CInvoke caller args  -> prettyExpr caller <> encloseSep "(" ")" ", " (map prettyCArg args)
    CBinary op a b       -> prettyExpr a <+> prettyBinOp op <+> prettyExpr b
-   CUnary op a          -> prettyUnOp op <+> prettyExpr a
+   CUnary op a          -> prettyUnOp op <> prettyExpr a
    CAssign left right   -> prettyExpr left <+> "=" <+> prettyExpr right
 
 prettyCArg :: CArg -> Doc ann

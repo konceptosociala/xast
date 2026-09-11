@@ -84,38 +84,38 @@ codegenInstruct = \case
    KirAssign bid val ->
       pure [CExprStmt (CAssign (CVar (bindingName bid)) (valueToExpr val))]
    KirMatch scrut arms mDefault target ->
-      (: []) <$> codegenMatch scrut arms mDefault target
+      codegenMatch scrut arms mDefault target
 
 codegenMatch
    :: KirValue
    -> [(Literal, [KirInstruct], KirValue)]
    -> Maybe ([KirInstruct], KirValue)
    -> KirBindingId
-   -> CCodegen CStmt
-codegenMatch scrut arms mDefault target = fromMaybe (CBlock []) <$> go arms
+   -> CCodegen [CStmt]
+codegenMatch scrut arms mDefault target = fromMaybe [] <$> go arms
    where
       scrutExpr = valueToExpr scrut
 
-      go :: [(Literal, [KirInstruct], KirValue)] -> CCodegen (Maybe CStmt)
+      go :: [(Literal, [KirInstruct], KirValue)] -> CCodegen (Maybe [CStmt])
       go [] = traverse codegenDefault mDefault
       go ((lit, instrs, val) : rest) = do
          armStmts <- codegenInstructs instrs
          elseStmt <- go rest
-         pure $ Just $ CIf
+         pure $ Just $ [CIf
             (CBinary Eq scrutExpr (literalToExpr lit))
-            (CBlock (armStmts ++ [assignTarget val]))
-            elseStmt
+            (armStmts ++ [assignTarget val])
+            elseStmt]
 
       codegenDefault (defInstrs, defVal) = do
          defStmts <- codegenInstructs defInstrs
-         pure (CBlock (defStmts ++ [assignTarget defVal]))
+         pure (defStmts ++ [assignTarget defVal])
 
-      assignTarget v = CExprStmt (CAssign (CVar (bindingName target)) (valueToExpr v))
+      assignTarget v = CExprStmt (CAssign (CUnary Deref (CVar (bindingName target))) (valueToExpr v))
 
 valueToExpr :: KirValue -> CExpr
 valueToExpr (KirConst lit)       = literalToExpr lit
 valueToExpr (KirVar (KirName n)) = CVar n
-valueToExpr (KirBindingRef bid)  = CVar (bindingName bid)
+valueToExpr (KirBindingRef bid)  = CUnary Deref (CVar (bindingName bid))
 
 literalToExpr :: Literal -> CExpr
 literalToExpr (LitInt n)   = CIntLit n

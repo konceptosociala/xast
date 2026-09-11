@@ -6,10 +6,12 @@ data CProgram = CProgram
    { path :: FilePath
    , declarations :: [CDecl]
    }
+   deriving Show
 
 data CDecl 
    = CFunc CFunction
    | CGlob CGlobal
+   deriving Show
 
 data CFunction = CFunction
    { ty   :: CType
@@ -17,17 +19,20 @@ data CFunction = CFunction
    , args :: [CFuncArg]
    , body :: [CStmt]
    }
+   deriving Show
 
 data CFuncArg = CFuncArg
    { ty   :: CType
    , name :: Text
    }
+   deriving Show
 
 data CGlobal = CGlobal
    { ty     :: CType
    , name   :: Text
    , expr   :: Maybe CExpr
    }
+   deriving Show
 
 data CType
    = CVoid     -- void
@@ -46,6 +51,7 @@ data CType
    | CBool     -- bool
    | CPointer CType
    | CStruct Text
+   deriving Show
 
 data CExpr
    = CVar Text
@@ -55,26 +61,31 @@ data CExpr
    | CBinary CBinOp CExpr CExpr
    | CUnary CUnOp CExpr
    | CAssign CExpr CExpr
+   deriving Show
 
 data CArg
    = CExprArg CExpr
    | CTypeArg CType
+   deriving Show
 
 data CBinOp
    = Add | Sub | Mul | Div
    | Eq | Ne | Lt | Le | Gt | Ge
    | And | Or
+   deriving Show
 
 data CUnOp
    = Neg
    | Not
    | AddrOf
    | Deref
+   deriving Show
 
 data CStmt
    = CBlock [CStmt]
    | CReturn (Maybe CExpr)
-   | CIf CExpr CStmt (Maybe CStmt)
+   | CIf CExpr [CStmt] (Maybe [CStmt])
    | CWhile CExpr CStmt
    | CExprStmt CExpr
    | CDeclStmt CType Text (Maybe CExpr)
+   deriving Show

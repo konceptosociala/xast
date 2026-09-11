@@ -20,8 +20,7 @@ import Xast.Utils.Pretty
 import qualified Toml
 import Control.Monad.RWS (MonadTrans(lift))
 import Xast.Lowerer.Pass (lowerPrograms)
-import Xast.Codegen.C.Types
-import Xast.Codegen.C.Pretty (prettyProgram, debugPrograms)
+import Xast.Codegen.C.Pretty (debugPrograms)
 import Xast.Codegen.C.Pass (codegen)
 
 runCompile :: Maybe FilePath -> IO ()
@@ -88,42 +87,10 @@ runCompile_ dir = runExceptT $ do
    -- Generating C
    let generatedC = codegen loweredIR
 
+   -- Temporarily print C programs as debug
+   ----------------------------------------
    liftIO $ putStrLn $ debugPrograms generatedC
-   
-   -- Temporary printing IR
-   ------------------------
-   liftIO $ print loweredIR
-   ------------------------
-
-   -- Test C prettyprinter
-   -----------------------
-   -- let c = CProgram
-   --       "<path>"
-   --       [ CFunc $ CFunction
-   --          { ty = CInt
-   --          , name = pack "opAdd"
-   --          , args = 
-   --             [ CArg
-   --                { ty = CInt
-   --                , name = pack "a"
-   --                }
-   --             , CArg
-   --                { ty = CInt
-   --                , name = pack "b"
-   --                }
-   --             ]
-   --          , body =
-   --             [ CReturn $ Just $ CBinary
-   --                Add
-   --                (CVar $ pack "a")
-   --                (CVar $ pack "b")
-   --             ]
-   --          }
-   --       ]
-
-   -- liftIO $ print $ prettyProgram c
-   -----------------------
-
+   ----------------------------------------
 
    return warnings
 
